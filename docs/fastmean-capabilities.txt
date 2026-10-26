@@ -172,7 +172,7 @@ graph-number edits1163..1169; OK1, Cancel2.
 Graph string resource IDs127/128 are Save data/Copy hints; dispatch semantics
 were not tested and should not be assumed from the string IDs alone.
 
-Adapter authoring and batch behavior (version 1.0.0)
+Adapter authoring and batch behavior (version 1.0.1)
 ---------------------------------------------------
 New circuits support R/C/L and independent U/V sources. U nodes are [positive,
 negative]. Engineering values are converted to numeric SI. Ground is node 0.

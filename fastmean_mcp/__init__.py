@@ -1,3 +1,3 @@
 """Local MCP integration for the installed FASTMEAN native engines."""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -83,6 +84,66 @@ class ArtifactTests(unittest.TestCase):
         entry = next(item for item in result["artifacts"] if item["name"] == "custom.svg")
         self.assertEqual(entry["mime_type"], "image/svg+xml")
         self.assertEqual(self.store.read_artifact("run-1", "custom.svg"), svg.read_bytes())
+
+    @unittest.skipUnless(os.name == "nt", "Windows DOS 8.3 aliases")
+    def test_short_windows_job_prefix_keeps_nested_declared_artifacts(self):
+        import ctypes
+        from ctypes import wintypes
+        alias_base = self.base / "a long directory name for path alias validation"
+        alias_base.mkdir()
+        get_short = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+        get_short.argtypes = (wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD)
+        get_short.restype = wintypes.DWORD
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_short(str(alias_base), buffer, len(buffer))
+        if not length:
+            self.skipTest(f"DOS alias unavailable: {ctypes.WinError(ctypes.get_last_error())}")
+        self.assertLess(length, len(buffer))
+        short_base = Path(buffer.value)
+        if short_base == alias_base:
+            self.skipTest("This volume does not create an alternate DOS 8.3 name")
+        self.assertEqual(short_base.resolve(strict=True), alias_base.resolve(strict=True))
+        short_root = short_base / "runs"
+        job = short_root / "run-1"
+        (job / "preview").mkdir(parents=True)
+        svg = job / "preview" / "custom.svg"
+        svg.write_text("<svg/>", encoding="utf-8")
+        store = ArtifactStore(short_root)
+        result = store.publish({"working_dir": str(job), "svg_path": str(svg)})
+        self.assertIn("custom.svg", {entry["name"] for entry in result["artifacts"]})
+        reopened = ArtifactStore(alias_base / "runs")
+        self.assertEqual(reopened.read_artifact("run-1", "custom.svg"), b"<svg/>")
+
+    def test_link_back_inside_job_is_still_rejected(self):
+        job = self.job()
+        target = job / "target"
+        target.mkdir()
+        (target / "custom.svg").write_text("<svg/>", encoding="utf-8")
+        link = job / "linked-preview"
+        try:
+            link.symlink_to(target, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"Creating symlinks is unavailable: {error}")
+        result = self.store.publish({"working_dir": str(job), "svg_path": str(link / "custom.svg")})
+        self.assertNotIn("custom.svg", {entry["name"] for entry in result["artifacts"]})
+        with self.assertRaisesRegex(ArtifactError, "Linked artifacts"):
+            self.store._file(job.resolve(), link / "custom.svg")
+
+    def test_link_to_output_root_cannot_reenter_same_job(self):
+        job = self.job()
+        (job / "preview").mkdir()
+        (job / "preview/custom.svg").write_text("<svg/>", encoding="utf-8")
+        link = job / "shortcut-to-output-root"
+        try:
+            link.symlink_to(self.root, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"Creating symlinks is unavailable: {error}")
+        raw = link / job.name / "preview/custom.svg"
+        self.assertTrue(raw.samefile(job / "preview/custom.svg"))
+        result = self.store.publish({"working_dir": str(job), "svg_path": str(raw)})
+        self.assertNotIn("custom.svg", {entry["name"] for entry in result["artifacts"]})
+        with self.assertRaisesRegex(ArtifactError, "Linked artifacts"):
+            self.store._file(job.resolve(), raw)
 
     def test_nested_declarations_survive_trimming_and_duplicate_basenames(self):
         job = self.job()

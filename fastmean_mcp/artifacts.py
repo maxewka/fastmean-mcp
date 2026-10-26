@@ -185,15 +185,28 @@ class ArtifactStore:
 
     def _file(self, job: Path, value: Path) -> Path:
         raw = value if value.is_absolute() else job / value
+        if ".." in raw.parts:
+            raise ArtifactError("Artifact traversal is forbidden.")
         resolved = raw.resolve(strict=True)
         if not resolved.is_relative_to(job) or resolved == job:
             raise ArtifactError("Artifact escapes its published job directory.")
-        relative = raw.absolute().relative_to(job)
-        current = job
-        for part in relative.parts:
-            if part in {".", ".."}: raise ArtifactError("Artifact traversal is forbidden.")
-            current = current / part
-            if _link(current): raise ArtifactError("Linked artifacts are not supported.")
+        # Windows may spell the same job prefix as RUNNER~1 or runneradmin.
+        # Compare resolved ancestors, but check each original component for a
+        # link before resolving it. Resolving the full path alone would hide a
+        # symlink/junction that points back inside the otherwise valid job.
+        original = raw.absolute()
+        ancestors = (original, *original.parents)
+        # Use the outermost matching prefix: a link inside the job could point
+        # to the output root and re-enter the same job through a second prefix.
+        boundary = next((parent for parent in reversed(ancestors)
+                         if parent.resolve(strict=True) == job), None)
+        if boundary is None:
+            raise ArtifactError("Artifact has no matching job directory.")
+        for current in ancestors:
+            if _link(current):
+                raise ArtifactError("Linked artifacts are not supported.")
+            if current == boundary:
+                break
         if not resolved.is_file(): raise ArtifactError("Artifact is not a regular file.")
         if resolved.suffix.lower() not in _MIMES and resolved.name not in {"out", "cir", "human.sym"}:
             raise ArtifactError("Unsupported artifact file format.")

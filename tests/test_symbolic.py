@@ -159,7 +159,9 @@ class NativeInvocationTests(unittest.TestCase):
 
     def test_native_output_retained_with_private_cwd_and_original_executable(self):
         def native(command, **kwargs):
-            self.assertEqual(Path(command[0]), self.app / "symbolic" / "cirsymw.exe")
+            # The launcher canonicalizes Windows DOS 8.3 TEMP aliases.
+            self.assertEqual(Path(command[0]).resolve(),
+                             (self.app / "symbolic" / "cirsymw.exe").resolve())
             cwd = Path(kwargs["cwd"])
             self.assertNotIn(self.app, cwd.parents)
             self.assertEqual((cwd / "cir").read_text(encoding="cp1251"), RC_NETLIST)

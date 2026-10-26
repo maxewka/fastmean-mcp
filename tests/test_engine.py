@@ -168,7 +168,10 @@ class EngineSafetyTests(unittest.TestCase):
                 engine._execute(job, manifest, 'open "circuit.scm";\nexit;\n')
         owned.kill.assert_called_once_with()
         self.assertEqual(launch.call_count, 1)
-        self.assertEqual(launch.call_args.args[0][0], str(self.app / "Fastmean.exe"))
+        # Windows TEMP may use a DOS 8.3 alias (RUNNER~1) while Engine resolves
+        # the installed executable to its canonical filesystem path.
+        self.assertEqual(Path(launch.call_args.args[0][0]).resolve(),
+                         (self.app / "Fastmean.exe").resolve())
         saved = json.loads((job / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["status"], "timed_out")
         self.assertEqual(saved["owned_pid"], 12345)

@@ -27,7 +27,7 @@ class ServerContractTests(unittest.TestCase):
             self.assertIsNone(status["executable_sha256"])
             self.assertIn("Fastmean.exe", status["installation_error"])
             self.assertFalse((self.root / "results").exists())
-            self.assertEqual(server.output_dir(), self.root / "results")
+            self.assertEqual(server.output_dir(), (self.root / "results").resolve())
             with self.assertRaises(FileNotFoundError):
                 server.engine()
 

@@ -1,4 +1,32 @@
-# Local validation of 1.0.0
+# Validation history
+
+## 1.0.1: Windows path aliases
+
+The first hosted Ubuntu test run passed. The Windows run exposed DOS 8.3
+temporary-directory aliases: nested declared artifacts were omitted when the
+raw job prefix used a short name, and three tests compared path spellings
+instead of canonical locations. Version 1.0.1 fixes artifact lookup and the
+three test assertions. The containment check remains strict; original path
+components are checked for symlinks/junctions before canonical comparison.
+
+Local Windows validation on 2026-10-26:
+
+- Full suite with native flags: **105 passed, 4 skipped**, 84 subtests,
+  37.02 seconds. Three skips concern symlink privileges, one the existing
+  PowerShell script policy.
+- A genuine `GetShortPathNameW` alias successfully published and reopened a
+  nested SVG. Executable-path regressions also passed under an actual short
+  TEMP path. A separate regression rejects links pointing back inside a job;
+  local Windows skipped link creation when the required privilege was absent.
+- A real unprivileged Windows junction that left and re-entered the same job
+  was separately rejected. Genuine DOS 8.3 aliases remain accepted.
+- Full suite without the native application and with TEMP/TMP set to an actual
+  short DOS 8.3 path: **92 passed, 17 skipped**, 84 subtests, 13.90 seconds.
+
+Hosted CI outcomes are available on the repository's Actions page; these local
+numbers do not claim an unobserved hosted result.
+
+## 1.0.0: initial local validation
 
 Checked on Windows on 2026-10-26 with an independently installed FASTMEAN 6.1
 and MCP Python SDK 2.3.0. These are local results, not a claim that hosted CI
