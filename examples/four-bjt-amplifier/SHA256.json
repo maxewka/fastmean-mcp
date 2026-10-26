@@ -1,0 +1,11 @@
+{
+  "Amplifier_4BJT.scm": "9ed6da45771fed29b5da1ebc43fe53e30a00c02182fd64c939568e65901cbd58",
+  "annotation.request.json": "1e64a023cbae7d5b2283c82f8a13eae61ebc7860d401132b26d0bc7168325299",
+  "measurements.json": "1ac4909c2a9e2fd9d0c924fc61ff8b14098aa02335abf4a9db9922869a44b8a4",
+  "models/NDRV.scm": "387d0c7f023865929c015af548bfa1ea98e9e84ea94a2ec9abe7c22d67314fa3",
+  "models/NOUT.scm": "ba696350791883b167f11121a7a839bfba1f714b8b62858144240b1e7447634d",
+  "models/PDRV.scm": "455abd2ac3aa236e9350d60a6ff8b4e1c6540700020ffc5dc5adab2b53d17016",
+  "models/POUT.scm": "b0ee7a523a7bf397a800119290b648eed079849e0b8707a6ab657101aa8f76d8",
+  "native-transient-last10ms.csv": "b9b434817e1a29dab30ca8837c879ea5744c23d74060a1de15e63e4bd782ddf1",
+  "project.input.json": "b32cb8c9b6b8a5da72f3a096f3fe0da59dd61974a5415ae6a1e21e8c40ac7097"
+}

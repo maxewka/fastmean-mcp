@@ -1,0 +1,1468 @@
+{
+  "name": "FourBJT_500W_nominal_PWL",
+  "models": {
+    "NOUT": {
+      "pins": {
+        "Left": [
+          "B"
+        ],
+        "Top": [
+          "C"
+        ],
+        "Right": [],
+        "Bottom": [
+          "E"
+        ]
+      },
+      "circuit": {
+        "components": [
+          {
+            "kind": "R",
+            "name": "RB",
+            "nodes": [
+              "B",
+              "BI"
+            ],
+            "value": 0.03
+          },
+          {
+            "kind": "R",
+            "name": "RC",
+            "nodes": [
+              "C",
+              "CI"
+            ],
+            "value": 0.005
+          },
+          {
+            "kind": "R",
+            "name": "RE",
+            "nodes": [
+              "E",
+              "EI"
+            ],
+            "value": 0.005
+          },
+          {
+            "kind": "D",
+            "name": "DBE",
+            "nodes": [
+              "BI",
+              "NF"
+            ],
+            "parameters": {
+              "Ron": 0.02,
+              "Roff": 1000000000.0,
+              "Uon": 0.7
+            }
+          },
+          {
+            "kind": "D",
+            "name": "DBC",
+            "nodes": [
+              "BI",
+              "NR"
+            ],
+            "parameters": {
+              "Ron": 0.010666666666666666,
+              "Roff": 533333333.3333333,
+              "Uon": 0.7
+            }
+          },
+          {
+            "kind": "F",
+            "name": "FF",
+            "nodes": [
+              "NF",
+              "EI",
+              "CI",
+              "BI"
+            ],
+            "value": -0.9375
+          },
+          {
+            "kind": "F",
+            "name": "FR",
+            "nodes": [
+              "NR",
+              "CI",
+              "EI",
+              "BI"
+            ],
+            "value": -0.5
+          }
+        ],
+        "ports": {
+          "B": "B",
+          "C": "C",
+          "E": "E"
+        },
+        "layout": {
+          "placements": {
+            "RB": {
+              "x": 600,
+              "y": 800,
+              "rotation": 0
+            },
+            "RC": {
+              "x": 1200,
+              "y": 520,
+              "rotation": 1
+            },
+            "RE": {
+              "x": 1200,
+              "y": 1080,
+              "rotation": 3
+            },
+            "DBE": {
+              "x": 800,
+              "y": 920,
+              "rotation": 1
+            },
+            "DBC": {
+              "x": 800,
+              "y": 680,
+              "rotation": 3
+            },
+            "FF": {
+              "x": 1040,
+              "y": 920,
+              "rotation": 0
+            },
+            "FR": {
+              "x": 1040,
+              "y": 680,
+              "rotation": 0
+            }
+          },
+          "nodes": {
+            "B": {
+              "x": 400,
+              "y": 800
+            },
+            "C": {
+              "x": 1200,
+              "y": 400
+            },
+            "E": {
+              "x": 1200,
+              "y": 1200
+            },
+            "BI": {
+              "x": 720,
+              "y": 800
+            },
+            "CI": {
+              "x": 1200,
+              "y": 600
+            },
+            "EI": {
+              "x": 1200,
+              "y": 1000
+            },
+            "NF": {
+              "x": 800,
+              "y": 1000
+            },
+            "NR": {
+              "x": 800,
+              "y": 600
+            }
+          },
+          "ports": {
+            "B": {
+              "x": 400,
+              "y": 800,
+              "rotation": 2
+            },
+            "C": {
+              "x": 1200,
+              "y": 400,
+              "rotation": 3
+            },
+            "E": {
+              "x": 1200,
+              "y": 1200,
+              "rotation": 1
+            }
+          }
+        }
+      }
+    },
+    "POUT": {
+      "pins": {
+        "Left": [
+          "B"
+        ],
+        "Top": [
+          "E"
+        ],
+        "Right": [],
+        "Bottom": [
+          "C"
+        ]
+      },
+      "circuit": {
+        "components": [
+          {
+            "kind": "R",
+            "name": "RB",
+            "nodes": [
+              "B",
+              "BI"
+            ],
+            "value": 0.03
+          },
+          {
+            "kind": "R",
+            "name": "RC",
+            "nodes": [
+              "C",
+              "CI"
+            ],
+            "value": 0.005
+          },
+          {
+            "kind": "R",
+            "name": "RE",
+            "nodes": [
+              "E",
+              "EI"
+            ],
+            "value": 0.005
+          },
+          {
+            "kind": "D",
+            "name": "DBE",
+            "nodes": [
+              "NF",
+              "BI"
+            ],
+            "parameters": {
+              "Ron": 0.02,
+              "Roff": 1000000000.0,
+              "Uon": 0.7
+            }
+          },
+          {
+            "kind": "D",
+            "name": "DBC",
+            "nodes": [
+              "NR",
+              "BI"
+            ],
+            "parameters": {
+              "Ron": 0.010666666666666666,
+              "Roff": 533333333.3333333,
+              "Uon": 0.7
+            }
+          },
+          {
+            "kind": "F",
+            "name": "FF",
+            "nodes": [
+              "EI",
+              "NF",
+              "CI",
+              "BI"
+            ],
+            "value": 0.9375
+          },
+          {
+            "kind": "F",
+            "name": "FR",
+            "nodes": [
+              "CI",
+              "NR",
+              "EI",
+              "BI"
+            ],
+            "value": 0.5
+          }
+        ],
+        "ports": {
+          "B": "B",
+          "C": "C",
+          "E": "E"
+        },
+        "layout": {
+          "placements": {
+            "RB": {
+              "x": 600,
+              "y": 800,
+              "rotation": 0
+            },
+            "RC": {
+              "x": 1200,
+              "y": 1080,
+              "rotation": 3
+            },
+            "RE": {
+              "x": 1200,
+              "y": 520,
+              "rotation": 1
+            },
+            "DBE": {
+              "x": 800,
+              "y": 920,
+              "rotation": 1
+            },
+            "DBC": {
+              "x": 800,
+              "y": 680,
+              "rotation": 3
+            },
+            "FF": {
+              "x": 1040,
+              "y": 920,
+              "rotation": 0
+            },
+            "FR": {
+              "x": 1040,
+              "y": 680,
+              "rotation": 0
+            }
+          },
+          "nodes": {
+            "B": {
+              "x": 400,
+              "y": 800
+            },
+            "C": {
+              "x": 1200,
+              "y": 1200
+            },
+            "E": {
+              "x": 1200,
+              "y": 400
+            },
+            "BI": {
+              "x": 720,
+              "y": 800
+            },
+            "CI": {
+              "x": 1200,
+              "y": 1000
+            },
+            "EI": {
+              "x": 1200,
+              "y": 600
+            },
+            "NF": {
+              "x": 800,
+              "y": 1000
+            },
+            "NR": {
+              "x": 800,
+              "y": 600
+            }
+          },
+          "ports": {
+            "B": {
+              "x": 400,
+              "y": 800,
+              "rotation": 2
+            },
+            "C": {
+              "x": 1200,
+              "y": 1200,
+              "rotation": 1
+            },
+            "E": {
+              "x": 1200,
+              "y": 400,
+              "rotation": 3
+            }
+          }
+        }
+      }
+    },
+    "NDRV": {
+      "pins": {
+        "Left": [
+          "B"
+        ],
+        "Top": [
+          "C"
+        ],
+        "Right": [],
+        "Bottom": [
+          "E"
+        ]
+      },
+      "circuit": {
+        "components": [
+          {
+            "kind": "R",
+            "name": "RB",
+            "nodes": [
+              "B",
+              "BI"
+            ],
+            "value": 0.1
+          },
+          {
+            "kind": "R",
+            "name": "RC",
+            "nodes": [
+              "C",
+              "CI"
+            ],
+            "value": 0.01
+          },
+          {
+            "kind": "R",
+            "name": "RE",
+            "nodes": [
+              "E",
+              "EI"
+            ],
+            "value": 0.01
+          },
+          {
+            "kind": "D",
+            "name": "DBE",
+            "nodes": [
+              "BI",
+              "NF"
+            ],
+            "parameters": {
+              "Ron": 0.1,
+              "Roff": 1000000000.0,
+              "Uon": 0.65
+            }
+          },
+          {
+            "kind": "D",
+            "name": "DBC",
+            "nodes": [
+              "BI",
+              "NR"
+            ],
+            "parameters": {
+              "Ron": 0.050625,
+              "Roff": 506250000.0,
+              "Uon": 0.65
+            }
+          },
+          {
+            "kind": "F",
+            "name": "FF",
+            "nodes": [
+              "NF",
+              "EI",
+              "CI",
+              "BI"
+            ],
+            "value": -0.9876543209876543
+          },
+          {
+            "kind": "F",
+            "name": "FR",
+            "nodes": [
+              "NR",
+              "CI",
+              "EI",
+              "BI"
+            ],
+            "value": -0.5
+          }
+        ],
+        "ports": {
+          "B": "B",
+          "C": "C",
+          "E": "E"
+        },
+        "layout": {
+          "placements": {
+            "RB": {
+              "x": 600,
+              "y": 800,
+              "rotation": 0
+            },
+            "RC": {
+              "x": 1200,
+              "y": 520,
+              "rotation": 1
+            },
+            "RE": {
+              "x": 1200,
+              "y": 1080,
+              "rotation": 3
+            },
+            "DBE": {
+              "x": 800,
+              "y": 920,
+              "rotation": 1
+            },
+            "DBC": {
+              "x": 800,
+              "y": 680,
+              "rotation": 3
+            },
+            "FF": {
+              "x": 1040,
+              "y": 920,
+              "rotation": 0
+            },
+            "FR": {
+              "x": 1040,
+              "y": 680,
+              "rotation": 0
+            }
+          },
+          "nodes": {
+            "B": {
+              "x": 400,
+              "y": 800
+            },
+            "C": {
+              "x": 1200,
+              "y": 400
+            },
+            "E": {
+              "x": 1200,
+              "y": 1200
+            },
+            "BI": {
+              "x": 720,
+              "y": 800
+            },
+            "CI": {
+              "x": 1200,
+              "y": 600
+            },
+            "EI": {
+              "x": 1200,
+              "y": 1000
+            },
+            "NF": {
+              "x": 800,
+              "y": 1000
+            },
+            "NR": {
+              "x": 800,
+              "y": 600
+            }
+          },
+          "ports": {
+            "B": {
+              "x": 400,
+              "y": 800,
+              "rotation": 2
+            },
+            "C": {
+              "x": 1200,
+              "y": 400,
+              "rotation": 3
+            },
+            "E": {
+              "x": 1200,
+              "y": 1200,
+              "rotation": 1
+            }
+          }
+        }
+      }
+    },
+    "PDRV": {
+      "pins": {
+        "Left": [
+          "B"
+        ],
+        "Top": [
+          "E"
+        ],
+        "Right": [],
+        "Bottom": [
+          "C"
+        ]
+      },
+      "circuit": {
+        "components": [
+          {
+            "kind": "R",
+            "name": "RB",
+            "nodes": [
+              "B",
+              "BI"
+            ],
+            "value": 0.1
+          },
+          {
+            "kind": "R",
+            "name": "RC",
+            "nodes": [
+              "C",
+              "CI"
+            ],
+            "value": 0.01
+          },
+          {
+            "kind": "R",
+            "name": "RE",
+            "nodes": [
+              "E",
+              "EI"
+            ],
+            "value": 0.01
+          },
+          {
+            "kind": "D",
+            "name": "DBE",
+            "nodes": [
+              "NF",
+              "BI"
+            ],
+            "parameters": {
+              "Ron": 0.1,
+              "Roff": 1000000000.0,
+              "Uon": 0.65
+            }
+          },
+          {
+            "kind": "D",
+            "name": "DBC",
+            "nodes": [
+              "NR",
+              "BI"
+            ],
+            "parameters": {
+              "Ron": 0.050625,
+              "Roff": 506250000.0,
+              "Uon": 0.65
+            }
+          },
+          {
+            "kind": "F",
+            "name": "FF",
+            "nodes": [
+              "EI",
+              "NF",
+              "CI",
+              "BI"
+            ],
+            "value": 0.9876543209876543
+          },
+          {
+            "kind": "F",
+            "name": "FR",
+            "nodes": [
+              "CI",
+              "NR",
+              "EI",
+              "BI"
+            ],
+            "value": 0.5
+          }
+        ],
+        "ports": {
+          "B": "B",
+          "C": "C",
+          "E": "E"
+        },
+        "layout": {
+          "placements": {
+            "RB": {
+              "x": 600,
+              "y": 800,
+              "rotation": 0
+            },
+            "RC": {
+              "x": 1200,
+              "y": 1080,
+              "rotation": 3
+            },
+            "RE": {
+              "x": 1200,
+              "y": 520,
+              "rotation": 1
+            },
+            "DBE": {
+              "x": 800,
+              "y": 920,
+              "rotation": 1
+            },
+            "DBC": {
+              "x": 800,
+              "y": 680,
+              "rotation": 3
+            },
+            "FF": {
+              "x": 1040,
+              "y": 920,
+              "rotation": 0
+            },
+            "FR": {
+              "x": 1040,
+              "y": 680,
+              "rotation": 0
+            }
+          },
+          "nodes": {
+            "B": {
+              "x": 400,
+              "y": 800
+            },
+            "C": {
+              "x": 1200,
+              "y": 1200
+            },
+            "E": {
+              "x": 1200,
+              "y": 400
+            },
+            "BI": {
+              "x": 720,
+              "y": 800
+            },
+            "CI": {
+              "x": 1200,
+              "y": 1000
+            },
+            "EI": {
+              "x": 1200,
+              "y": 600
+            },
+            "NF": {
+              "x": 800,
+              "y": 1000
+            },
+            "NR": {
+              "x": 800,
+              "y": 600
+            }
+          },
+          "ports": {
+            "B": {
+              "x": 400,
+              "y": 800,
+              "rotation": 2
+            },
+            "C": {
+              "x": 1200,
+              "y": 1200,
+              "rotation": 1
+            },
+            "E": {
+              "x": 1200,
+              "y": 400,
+              "rotation": 3
+            }
+          }
+        }
+      }
+    }
+  },
+  "circuit": {
+    "components": [
+      {
+        "kind": "U",
+        "name": "VCC",
+        "nodes": [
+          "VPP",
+          "0"
+        ],
+        "value": 38.0,
+        "waveform": {
+          "kind": "dc",
+          "amplitude": 38.0
+        }
+      },
+      {
+        "kind": "U",
+        "name": "VEE",
+        "nodes": [
+          "0",
+          "VNN"
+        ],
+        "value": 38.0,
+        "waveform": {
+          "kind": "dc",
+          "amplitude": 38.0
+        }
+      },
+      {
+        "kind": "U",
+        "name": "VIN",
+        "nodes": [
+          "IN",
+          "0"
+        ],
+        "value": 1.4142135623730951,
+        "waveform": {
+          "kind": "sine",
+          "amplitude": 1.4142135623730951,
+          "frequency": 1000,
+          "phase": -90
+        }
+      },
+      {
+        "kind": "R",
+        "name": "RA_P",
+        "nodes": [
+          "VPP",
+          "BOP"
+        ],
+        "value": 8.2
+      },
+      {
+        "kind": "R",
+        "name": "RB_P",
+        "nodes": [
+          "BOP",
+          "BP"
+        ],
+        "value": 4.7
+      },
+      {
+        "kind": "C",
+        "name": "CBOOT_P",
+        "nodes": [
+          "BOP",
+          "OUT"
+        ],
+        "value": 0.01,
+        "initial_condition": 14.29290152254828
+      },
+      {
+        "kind": "C",
+        "name": "CIN_P",
+        "nodes": [
+          "INN",
+          "IN"
+        ],
+        "value": 0.001,
+        "initial_condition": -37.025092550958206
+      },
+      {
+        "kind": "R",
+        "name": "RIN_P",
+        "nodes": [
+          "INN",
+          "BDN"
+        ],
+        "value": 24
+      },
+      {
+        "kind": "R",
+        "name": "RFB_P",
+        "nodes": [
+          "OUT",
+          "BDN"
+        ],
+        "value": 2958.192887903313
+      },
+      {
+        "kind": "R",
+        "name": "RBIAS_P",
+        "nodes": [
+          "REFN",
+          "BDN"
+        ],
+        "value": 69.04195248892718
+      },
+      {
+        "kind": "R",
+        "name": "RREF_P",
+        "nodes": [
+          "0",
+          "REFN"
+        ],
+        "value": 1000.0
+      },
+      {
+        "kind": "D",
+        "name": "DREF_P1",
+        "nodes": [
+          "REFN",
+          "DN1"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_P2",
+        "nodes": [
+          "DN1",
+          "DN2"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_P3",
+        "nodes": [
+          "DN2",
+          "DN3"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_P4",
+        "nodes": [
+          "DN3",
+          "VNN"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "R",
+        "name": "RA_N",
+        "nodes": [
+          "VNN",
+          "BON"
+        ],
+        "value": 8.2
+      },
+      {
+        "kind": "R",
+        "name": "RB_N",
+        "nodes": [
+          "BON",
+          "BN"
+        ],
+        "value": 4.7
+      },
+      {
+        "kind": "C",
+        "name": "CBOOT_N",
+        "nodes": [
+          "BON",
+          "OUT"
+        ],
+        "value": 0.01,
+        "initial_condition": -14.292901522548233
+      },
+      {
+        "kind": "C",
+        "name": "CIN_N",
+        "nodes": [
+          "INP",
+          "IN"
+        ],
+        "value": 0.001,
+        "initial_condition": 37.02509255095821
+      },
+      {
+        "kind": "R",
+        "name": "RIN_N",
+        "nodes": [
+          "INP",
+          "BDP"
+        ],
+        "value": 24
+      },
+      {
+        "kind": "R",
+        "name": "RFB_N",
+        "nodes": [
+          "OUT",
+          "BDP"
+        ],
+        "value": 2958.192887903313
+      },
+      {
+        "kind": "R",
+        "name": "RBIAS_N",
+        "nodes": [
+          "REFP",
+          "BDP"
+        ],
+        "value": 69.04195248892718
+      },
+      {
+        "kind": "R",
+        "name": "RREF_N",
+        "nodes": [
+          "0",
+          "REFP"
+        ],
+        "value": 1000.0
+      },
+      {
+        "kind": "D",
+        "name": "DREF_N1",
+        "nodes": [
+          "VPP",
+          "DP1"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_N2",
+        "nodes": [
+          "DP1",
+          "DP2"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_N3",
+        "nodes": [
+          "DP2",
+          "DP3"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DREF_N4",
+        "nodes": [
+          "DP3",
+          "REFP"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "R",
+        "name": "RE_N",
+        "nodes": [
+          "EN",
+          "OUT"
+        ],
+        "value": 0.02
+      },
+      {
+        "kind": "R",
+        "name": "RE_P",
+        "nodes": [
+          "EP",
+          "OUT"
+        ],
+        "value": 0.02
+      },
+      {
+        "kind": "R",
+        "name": "RL",
+        "nodes": [
+          "OUT",
+          "0"
+        ],
+        "value": 1.25
+      },
+      {
+        "kind": "D",
+        "name": "DCLAMP_N",
+        "nodes": [
+          "EN",
+          "BP"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "D",
+        "name": "DCLAMP_P",
+        "nodes": [
+          "BN",
+          "EP"
+        ],
+        "parameters": {
+          "Ron": 0.01,
+          "Roff": 1000000000.0,
+          "Uon": 0.65
+        }
+      },
+      {
+        "kind": "X",
+        "name": "Q1",
+        "model": "NDRV",
+        "connections": {
+          "B": "BDN",
+          "C": "BP",
+          "E": "VNN"
+        }
+      },
+      {
+        "kind": "X",
+        "name": "Q2",
+        "model": "PDRV",
+        "connections": {
+          "B": "BDP",
+          "C": "BN",
+          "E": "VPP"
+        }
+      },
+      {
+        "kind": "X",
+        "name": "Q3",
+        "model": "NOUT",
+        "connections": {
+          "B": "BP",
+          "C": "VPP",
+          "E": "EN"
+        }
+      },
+      {
+        "kind": "X",
+        "name": "Q4",
+        "model": "POUT",
+        "connections": {
+          "B": "BN",
+          "C": "VNN",
+          "E": "EP"
+        }
+      }
+    ],
+    "ports": {
+      "IN": "IN",
+      "OUT": "OUT",
+      "VPP": "VPP",
+      "VNN": "VNN"
+    },
+    "analysis": {
+      "input": "IN",
+      "output": "OUT",
+      "transient": {
+        "start": 0,
+        "stop": 0.5,
+        "step": 1e-05
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 100000,
+        "points": 101
+      }
+    },
+    "layout": {
+      "density": "compact",
+      "placements": {
+        "VCC": {
+          "x": 240,
+          "y": 520,
+          "rotation": 3
+        },
+        "VEE": {
+          "x": 240,
+          "y": 1800,
+          "rotation": 3
+        },
+        "VIN": {
+          "x": 240,
+          "y": 1160,
+          "rotation": 3
+        },
+        "RA_P": {
+          "x": 1580,
+          "y": 500,
+          "rotation": 1
+        },
+        "RB_P": {
+          "x": 1580,
+          "y": 740,
+          "rotation": 1
+        },
+        "CBOOT_P": {
+          "x": 1800,
+          "y": 620,
+          "rotation": 0
+        },
+        "RA_N": {
+          "x": 1580,
+          "y": 1820,
+          "rotation": 3
+        },
+        "RB_N": {
+          "x": 1580,
+          "y": 1580,
+          "rotation": 3
+        },
+        "CBOOT_N": {
+          "x": 1800,
+          "y": 1700,
+          "rotation": 0
+        },
+        "CIN_P": {
+          "x": 600,
+          "y": 1440,
+          "rotation": 2
+        },
+        "RIN_P": {
+          "x": 900,
+          "y": 1440,
+          "rotation": 0
+        },
+        "RFB_P": {
+          "x": 1040,
+          "y": 1920,
+          "rotation": 2
+        },
+        "RBIAS_P": {
+          "x": 980,
+          "y": 1580,
+          "rotation": 3
+        },
+        "RREF_P": {
+          "x": 580,
+          "y": 1280,
+          "rotation": 0
+        },
+        "CIN_N": {
+          "x": 600,
+          "y": 880,
+          "rotation": 2
+        },
+        "RIN_N": {
+          "x": 900,
+          "y": 880,
+          "rotation": 0
+        },
+        "RFB_N": {
+          "x": 1040,
+          "y": 400,
+          "rotation": 2
+        },
+        "RBIAS_N": {
+          "x": 980,
+          "y": 740,
+          "rotation": 1
+        },
+        "RREF_N": {
+          "x": 580,
+          "y": 1040,
+          "rotation": 0
+        },
+        "RE_N": {
+          "x": 1880,
+          "y": 1080,
+          "rotation": 1
+        },
+        "RE_P": {
+          "x": 1880,
+          "y": 1240,
+          "rotation": 3
+        },
+        "RL": {
+          "x": 2200,
+          "y": 1320,
+          "rotation": 1
+        },
+        "DCLAMP_N": {
+          "x": 1740,
+          "y": 1040,
+          "rotation": 2
+        },
+        "DCLAMP_P": {
+          "x": 1740,
+          "y": 1280,
+          "rotation": 0
+        },
+        "Q1": {
+          "x": 1160,
+          "y": 1440,
+          "rotation": 0
+        },
+        "Q2": {
+          "x": 1160,
+          "y": 880,
+          "rotation": 0
+        },
+        "Q3": {
+          "x": 1880,
+          "y": 880,
+          "rotation": 0
+        },
+        "Q4": {
+          "x": 1880,
+          "y": 1440,
+          "rotation": 0
+        },
+        "DREF_N1": {
+          "x": 760,
+          "y": 440,
+          "rotation": 1
+        },
+        "DREF_P1": {
+          "x": 760,
+          "y": 1520,
+          "rotation": 1
+        },
+        "DREF_N2": {
+          "x": 760,
+          "y": 560,
+          "rotation": 1
+        },
+        "DREF_P2": {
+          "x": 760,
+          "y": 1640,
+          "rotation": 1
+        },
+        "DREF_N3": {
+          "x": 760,
+          "y": 680,
+          "rotation": 1
+        },
+        "DREF_P3": {
+          "x": 760,
+          "y": 1760,
+          "rotation": 1
+        },
+        "DREF_N4": {
+          "x": 760,
+          "y": 800,
+          "rotation": 1
+        },
+        "DREF_P4": {
+          "x": 760,
+          "y": 1880,
+          "rotation": 1
+        }
+      },
+      "nodes": {
+        "0": {
+          "x": 240,
+          "y": 2240
+        },
+        "IN": {
+          "x": 440,
+          "y": 1160
+        },
+        "OUT": {
+          "x": 2120,
+          "y": 1160
+        },
+        "VPP": {
+          "x": 1880,
+          "y": 320
+        },
+        "VNN": {
+          "x": 1880,
+          "y": 2000
+        },
+        "BOP": {
+          "x": 1580,
+          "y": 620
+        },
+        "BON": {
+          "x": 1580,
+          "y": 1700
+        },
+        "BP": {
+          "x": 1580,
+          "y": 880
+        },
+        "BN": {
+          "x": 1580,
+          "y": 1440
+        },
+        "BDN": {
+          "x": 1020,
+          "y": 1440
+        },
+        "BDP": {
+          "x": 1020,
+          "y": 880
+        },
+        "INN": {
+          "x": 740,
+          "y": 1440
+        },
+        "INP": {
+          "x": 740,
+          "y": 880
+        },
+        "REFN": {
+          "x": 760,
+          "y": 1460
+        },
+        "REFP": {
+          "x": 760,
+          "y": 860
+        },
+        "EN": {
+          "x": 1880,
+          "y": 1000
+        },
+        "EP": {
+          "x": 1880,
+          "y": 1320
+        },
+        "DP1": {
+          "x": 760,
+          "y": 500
+        },
+        "DN1": {
+          "x": 760,
+          "y": 1580
+        },
+        "DP2": {
+          "x": 760,
+          "y": 620
+        },
+        "DN2": {
+          "x": 760,
+          "y": 1700
+        },
+        "DP3": {
+          "x": 760,
+          "y": 740
+        },
+        "DN3": {
+          "x": 760,
+          "y": 1820
+        }
+      },
+      "ports": {
+        "IN": {
+          "x": 440,
+          "y": 1160,
+          "rotation": 2
+        },
+        "OUT": {
+          "x": 2400,
+          "y": 1160,
+          "rotation": 0
+        },
+        "VPP": {
+          "x": 2400,
+          "y": 320,
+          "rotation": 0
+        },
+        "VNN": {
+          "x": 2400,
+          "y": 2000,
+          "rotation": 0
+        }
+      }
+    }
+  }
+}
