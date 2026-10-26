@@ -1,0 +1,42 @@
+name: Portable tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python 3.12 / ${{ matrix.os }} / no native app
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: "1"
+      MPLBACKEND: Agg
+      # An absent installation makes native tests skip honestly.
+      FASTMEAN_APP_DIR: ${{ runner.temp }}/fastmean-not-installed
+      FASTMEAN_MCP_NATIVE_TEST: "0"
+      FASTMEAN_RELAYOUT_NATIVE: "0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+      - name: Install dependencies and adapter
+        run: python -m pip install -r requirements-dev.txt -e .
+      - name: Run tests without proprietary FASTMEAN binaries
+        run: python -m pytest -q

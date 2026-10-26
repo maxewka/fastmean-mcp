@@ -1,0 +1,351 @@
+"""Persistent, bounded MCP results and explicitly published job artifacts."""
+from __future__ import annotations
+
+import copy
+import csv
+from datetime import datetime, timezone
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import tempfile
+from typing import Any
+
+MAX_READ_BYTES = 8 * 1024 * 1024
+MAX_RESPONSE_BYTES = 128 * 1024
+_FORMAT = "fastmean-mcp-artifacts-v1"
+_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+_KNOWN = frozenset({"data.csv", "plot.png", "schematic.svg", "schematic.png", "circuit.scm",
+    "edited.scm", "native_data.txt", "netlist.txt", "manifest.json", "run.txt", "stdout.txt",
+    "stderr.txt", "out", "cir", "human.sym", "mcp-result-full.json"})
+_DECLARED = frozenset({"path", "csv_path", "plot_path", "svg_path", "png_path", "data_path",
+    "native_data_path", "manifest_path", "script_path", "native_output_path", "input_path",
+    "settings_path", "output_path", "stdout_path", "stderr_path", "scm_path", "circuit_path"})
+_MIMES = {".csv": "text/csv", ".png": "image/png", ".svg": "image/svg+xml",
+          ".scm": "text/plain", ".json": "application/json", ".txt": "text/plain"}
+_PRIORITY = frozenset({"ok", "error", "status", "code", "run_id", "resource_uri",
+                      "working_dir", "cwd", "count", "truncated"}) | _DECLARED
+
+
+class ArtifactError(ValueError):
+    """Invalid run, unpublished artifact or unsupported artifact operation."""
+
+
+def _name(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not _NAME.fullmatch(value) or value in {".", ".."}:
+        raise ArtifactError(f"{label} must be a plain ASCII basename, without paths.")
+    return value
+
+
+def _bound(value: dict, max_bytes: int = MAX_RESPONSE_BYTES) -> dict:
+    if not isinstance(value, dict):
+        raise ArtifactError("A result must be a JSON object.")
+    for factor in (1, 2, 4, 8):
+        remaining = [max(1024, min(48 * 1024, max_bytes // 2) // factor), max(80, 1500 // factor)]
+        cuts = []
+
+        def cut(path, reason, original=None, kept=None):
+            if len(cuts) < 64:
+                item = {"path": path[-160:], "reason": reason}
+                if original is not None: item["original"] = original
+                if kept is not None: item["kept"] = kept
+                cuts.append(item)
+
+        def visit(item, path="", depth=0, list_limit=200):
+            remaining[1] -= 1
+            if depth > 12:
+                cut(path, "depth_limit")
+                return "[depth limit]"
+            if isinstance(item, Path): item = str(item)
+            if isinstance(item, str):
+                count = min(len(item), 16 * 1024, max(0, remaining[0]))
+                remaining[0] -= count
+                if count < len(item): cut(path, "text_limit", len(item), count)
+                return item[:count]
+            if item is None or isinstance(item, bool): return item
+            if isinstance(item, int):
+                if item.bit_length() > 256:
+                    cut(path, "integer_size")
+                    return "[integer exceeds 256 bits]"
+                return item
+            if isinstance(item, float):
+                if not math.isfinite(item):
+                    cut(path, "nonfinite_number")
+                    return repr(item)
+                return item
+            if isinstance(item, (list, tuple)):
+                output = []
+                for index, child in enumerate(item[:list_limit]):
+                    if remaining[0] <= 0 or remaining[1] <= 0: break
+                    output.append(visit(child, f"{path}[{index}]", depth + 1))
+                if len(output) < len(item): cut(path, "array_limit", len(item), len(output))
+                return output
+            if isinstance(item, dict):
+                output = {}
+                # Preserve control fields and generated paths ahead of verbose
+                # tables, model collections and native solver output.
+                pairs = sorted(item.items(), key=lambda pair: str(pair[0]) not in _PRIORITY)
+                for index, (key, child) in enumerate(pairs):
+                    if index >= 200 or remaining[0] <= 0 or remaining[1] <= 0:
+                        cut(path, "object_limit", len(item), len(output)); break
+                    key = str(key)
+                    short_key = key[:128]
+                    remaining[0] -= len(short_key)
+                    if short_key != key: cut(path, "key_limit", len(key), len(short_key))
+                    child_path = f"{path}.{short_key}" if path else short_key
+                    if key == "rows" and isinstance(child, (list, tuple)):
+                        output["preview_rows"] = visit(child, child_path, depth + 1, 8)
+                    else:
+                        output[short_key] = visit(child, child_path, depth + 1, 8 if key == "preview_rows" else 200)
+                return output
+            raise ArtifactError(f"Unsupported result value type: {type(item).__name__}")
+
+        result = visit(value)
+        if cuts:
+            result["truncated"] = True
+            result["truncation"] = cuts
+        if len(json.dumps(result, ensure_ascii=False, allow_nan=False).encode("utf-8")) <= max_bytes:
+            return result
+    return {"truncated": True, "truncation": [{"path": "", "reason": "response_budget"}],
+            "message": "Result exceeds the response budget; use the published artifacts."}
+
+
+def bounded_result(value: dict) -> dict:
+    """Bound read-only responses without writing files or creating directories."""
+    return _bound(value)
+
+
+def _link(path: Path) -> bool:
+    return path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
+
+
+def _declared_paths(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in _DECLARED and isinstance(child, (str, Path)):
+                yield Path(child)
+            elif isinstance(child, (dict, list, tuple)):
+                yield from _declared_paths(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            if isinstance(child, (dict, list, tuple)):
+                yield from _declared_paths(child)
+
+
+def _atomic_json(path: Path, value: dict) -> None:
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                prefix=".mcp-result-", suffix=".tmp", dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump(value, stream, ensure_ascii=False, allow_nan=False, default=lambda obj: str(obj) if isinstance(obj, Path) else _unsupported(obj))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _unsupported(value):
+    raise ArtifactError(f"Unsupported result value type: {type(value).__name__}")
+
+
+class ArtifactStore:
+    def __init__(self, root: Path):
+        # Resolving an absent configured root is read-only; creation belongs to
+        # the operation that produces a job, never to discovery or construction.
+        self.root = Path(root).expanduser().resolve()
+
+    def _job(self, run_id: str) -> Path:
+        name = _name(run_id, "run_id")
+        candidate = self.root / name
+        if _link(candidate):
+            raise ArtifactError("Linked job directories are not supported.")
+        resolved = candidate.resolve(strict=True)
+        if resolved.parent != self.root or not resolved.is_dir():
+            raise ArtifactError("A run must be an existing direct child of the configured output root.")
+        return resolved
+
+    def _result_job(self, result: dict) -> Path:
+        value = result.get("working_dir") or result.get("cwd")
+        if not value:
+            value = Path(result["path"]).parent if result.get("path") else None
+        if value is None:
+            raise ArtifactError("The result must identify its existing working_dir, cwd or file path.")
+        raw = Path(value).expanduser()
+        if _link(raw): raise ArtifactError("Linked job directories are not supported.")
+        resolved = raw.resolve(strict=True)
+        if resolved.parent != self.root:
+            raise ArtifactError("Result artifacts must belong to one direct child job of the output root.")
+        return self._job(resolved.name)
+
+    def _file(self, job: Path, value: Path) -> Path:
+        raw = value if value.is_absolute() else job / value
+        resolved = raw.resolve(strict=True)
+        if not resolved.is_relative_to(job) or resolved == job:
+            raise ArtifactError("Artifact escapes its published job directory.")
+        relative = raw.absolute().relative_to(job)
+        current = job
+        for part in relative.parts:
+            if part in {".", ".."}: raise ArtifactError("Artifact traversal is forbidden.")
+            current = current / part
+            if _link(current): raise ArtifactError("Linked artifacts are not supported.")
+        if not resolved.is_file(): raise ArtifactError("Artifact is not a regular file.")
+        if resolved.suffix.lower() not in _MIMES and resolved.name not in {"out", "cir", "human.sym"}:
+            raise ArtifactError("Unsupported artifact file format.")
+        if len(resolved.relative_to(job).as_posix()) > 256:
+            raise ArtifactError("Artifact relative path is too long.")
+        return resolved
+
+    def _catalog(self, job: Path, result: dict) -> list[dict]:
+        candidates = [job / name for name in sorted(_KNOWN)]
+        candidates.extend(_declared_paths(result))
+        seen, names, catalog = set(), set(), []
+        for candidate in candidates:
+            try:
+                path = self._file(job, candidate)
+                if path in seen: continue
+                name = _name(path.name, "artifact name")
+            except (ArtifactError, OSError, ValueError):
+                continue
+            seen.add(path)
+            if name in names:
+                base, suffix = path.stem, path.suffix
+                counter = 2
+                while True:
+                    marker = f"-{counter}"
+                    name = f"{base[:128 - len(suffix) - len(marker)]}{marker}{suffix}"
+                    if name not in names: break
+                    counter += 1
+                name = _name(name, "artifact name")
+            names.add(name)
+            size = path.stat().st_size
+            item = {"name": name, "uri": f"fastmean://artifacts/{job.name}/{name}",
+                    "mime_type": _MIMES.get(path.suffix.lower(), "text/plain"), "size": size,
+                    "relative_path": path.relative_to(job).as_posix()}
+            if size <= MAX_READ_BYTES:
+                item["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+            catalog.append(item)
+            if len(catalog) >= 100: break
+        return catalog
+
+    def publish(self, result: dict) -> dict:
+        if not isinstance(result, dict): raise ArtifactError("A result must be a JSON object.")
+        job = self._result_job(result)
+        _atomic_json(job / "mcp-result-full.json", result)
+        catalog = self._catalog(job, result)
+        for budget in (MAX_RESPONSE_BYTES // 3, 16 * 1024, 4096):
+            record = _bound(result, budget)
+            record.update({"record_format": _FORMAT, "run_id": job.name,
+                "resource_uri": f"fastmean://runs/{job.name}", "artifacts": catalog,
+                # Keep the validated declarations even when a large preceding
+                # payload caused their source fields to be trimmed. These are
+                # relative paths established by _catalog, never caller paths
+                # accepted by the read API.
+                "published_artifact_paths": [item["relative_path"] for item in catalog],
+                "published_utc": datetime.now(timezone.utc).isoformat()})
+            if len(json.dumps(record, ensure_ascii=False, allow_nan=False).encode("utf-8")) <= MAX_RESPONSE_BYTES:
+                break
+        else:
+            raise ArtifactError("Artifact catalog exceeds the response budget.")
+        _atomic_json(job / "mcp-result.json", record)
+        return copy.deepcopy(record)
+
+    def get_run(self, run_id: str) -> dict:
+        job = self._job(run_id)
+        record_path = job / "mcp-result.json"
+        if _link(record_path) or not record_path.is_file() or record_path.stat().st_size > MAX_RESPONSE_BYTES:
+            raise ArtifactError("Run has no recognized bounded result record.")
+        try:
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ArtifactError("Run result record is unreadable.") from error
+        if not isinstance(record, dict) or record.get("record_format") != _FORMAT or record.get("run_id") != run_id or record.get("resource_uri") != f"fastmean://runs/{run_id}" or not isinstance(record.get("artifacts"), list) or len(record["artifacts"]) > 100:
+            raise ArtifactError("Run has no recognized result record.")
+        return record
+
+    def list_runs(self, limit: int = 20) -> dict:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ArtifactError("limit must be an integer from 1 to 100.")
+        if not self.root.exists(): return {"runs": [], "count": 0, "truncated": False}
+        records = []
+        for child in self.root.iterdir():
+            try:
+                if not child.is_dir() or _link(child): continue
+                record = self.get_run(child.name)
+            except (ArtifactError, OSError): continue
+            records.append({key: record[key] for key in ("run_id", "resource_uri", "published_utc", "analysis", "origin", "ok") if key in record})
+        records.sort(key=lambda item: str(item.get("published_utc", "")), reverse=True)
+        return bounded_result({"count": len(records), "truncated": len(records) > limit, "runs": records[:limit]})
+
+    def _artifact(self, run_id: str, name: str) -> tuple[Path, dict, dict]:
+        name = _name(name, "artifact name")
+        record = self.get_run(run_id)
+        entry = next((item for item in record["artifacts"] if isinstance(item, dict) and item.get("name") == name), None)
+        if entry is None: raise ArtifactError("Artifact was not published for this run.")
+        job = self._job(run_id)
+        relative = entry.get("relative_path")
+        if not isinstance(relative, str) or Path(relative).is_absolute():
+            raise ArtifactError("Invalid artifact catalog path.")
+        path = self._file(job, Path(relative))
+        # Re-establish authorization from the recorded result, not only from a
+        # catalog entry: an unrelated file with an allowed suffix is insufficient.
+        declared = set()
+        for value in _declared_paths(record):
+            try: declared.add(self._file(job, value))
+            except (ArtifactError, OSError, ValueError): pass
+        published_paths = record.get("published_artifact_paths", [])
+        persisted_declaration = (isinstance(published_paths, list)
+                                 and relative in published_paths)
+        if not (path.parent == job and path.name in _KNOWN) and path not in declared and not persisted_declaration:
+            raise ArtifactError("Artifact is not a known or explicitly declared result file.")
+        if path.stat().st_size != entry.get("size"):
+            raise ArtifactError("Artifact changed after publication.")
+        return path, entry, record
+
+    def read_artifact(self, run_id: str, name: str) -> bytes:
+        path, entry, _ = self._artifact(run_id, name)
+        if path.stat().st_size > MAX_READ_BYTES:
+            raise ArtifactError("Artifact exceeds 8 MiB; use paged CSV data or its local file.")
+        data = path.read_bytes()
+        if len(data) > MAX_READ_BYTES: raise ArtifactError("Artifact exceeds 8 MiB.")
+        if entry.get("sha256") and hashlib.sha256(data).hexdigest() != entry["sha256"]:
+            raise ArtifactError("Artifact changed after publication.")
+        return data
+
+    def read_data(self, run_id: str, offset: int = 0, limit: int = 200) -> dict:
+        if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= 1000000:
+            raise ArtifactError("offset must be an integer from 0 to 1000000.")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
+            raise ArtifactError("limit must be an integer from 1 to 500.")
+        record = self.get_run(run_id)
+        choices = sorted((item for item in record["artifacts"] if isinstance(item, dict) and str(item.get("name", "")).lower().endswith(".csv")), key=lambda item: (item["name"] != "data.csv", item["name"]))
+        if not choices: raise ArtifactError("Run has no published CSV data.")
+        path, entry, _ = self._artifact(run_id, choices[0]["name"])
+        rows, more, byte_count = [], False, 0
+        try:
+            with path.open("r", encoding="utf-8-sig", newline="") as stream:
+                reader = csv.reader(stream)
+                header = next(reader, None)
+                if not header or len(header) > 64 or any(not item for item in header) or sum(len(item.encode("utf-8")) for item in header) > 8192:
+                    raise ArtifactError("CSV has an invalid or oversized column header.")
+                for index, raw in enumerate(reader):
+                    if len(raw) != len(header): raise ArtifactError(f"CSV row {index + 1} has the wrong column count.")
+                    try: row = [float(item) for item in raw]
+                    except ValueError as error: raise ArtifactError(f"CSV row {index + 1} is not numeric.") from error
+                    if not all(math.isfinite(item) for item in row): raise ArtifactError(f"CSV row {index + 1} has a nonfinite number.")
+                    if index < offset: continue
+                    row_bytes = len(json.dumps(row).encode("ascii")) + 1
+                    if len(rows) >= limit or byte_count + row_bytes > 96 * 1024:
+                        more = True; break
+                    rows.append(row); byte_count += row_bytes
+        except (OSError, UnicodeError, csv.Error) as error:
+            raise ArtifactError(f"Could not read numeric CSV data: {error}") from error
+        return {"run_id": run_id, "columns": header, "rows": rows, "offset": offset,
+                "limit": limit, "returned_count": len(rows), "has_more": more,
+                "next_offset": offset + len(rows) if more else None,
+                "csv_artifact": entry["name"], "resource_uri": entry["uri"]}

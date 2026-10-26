@@ -1,0 +1,48 @@
+# Python environments and generated package files
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+/dist/
+/build/lib/
+/build/bdist.*/
+
+# Local installations, calculations and private validation
+/demo/
+/demo-human/
+/results/
+/runtime/
+/local/
+/work/
+/docs/installation-validation.json
+/docs/validation-tests.txt
+install-state.json
+*.log
+*.tmp
+.codex/
+.env
+.env.*
+!.env.example
+
+# Native applications, downloaded references, fonts and release archives
+*.exe
+*.dll
+*.msi
+*.pdf
+*.zip
+*.ttf
+*.otf
+*.fon
+
+# Editor / operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

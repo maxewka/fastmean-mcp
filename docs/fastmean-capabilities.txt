@@ -1,0 +1,216 @@
+FASTMEAN native capabilities reference for the MCP implementation
+Research date: 2026-10-26. This document describes source evidence, not a test log.
+
+Sources and evidence
+--------------------
+1. FASTMEAN 6.0 user manual, fastmean_6.0.pdf, 44 pages,
+   Filin V.A. / Smirnov V.S., 2000-2014. SHA256:
+   168087281FFA76112D5CA343E1A03752FF9F4E34F8595EA3C22F7A96E7717B51
+   Relevant pages 19-23 and 31-34 were rendered and visually checked. Raw PDF
+   text extraction has font artifacts; syntax below was checked against images.
+2. Official symbolic-analysis page, fetched successfully over HTTP (status 200,
+   windows-1251) on the research date:
+   http://www.fastmean.ru/rus/index.php?page=symbolic.php
+3. Static resources/strings of the installed FASTMEAN 6.1 Fastmean.exe. SHA256:
+   A001582ADA87CDF013605F43B019957AE23204EF4BFCC33BE02A0681B186EE25
+   Static control/menu identifiers below are observations, not a public API.
+
+Native automation: documented command line, not a fabricated API
+----------------------------------------------------------------
+The manual explicitly documents batch/script automation for repeated analyses
+and subsequent processing with MATLAB or Python/NumPy/SciPy (pages 32-34).
+
+  Fastmean.exe -s "script.txt"
+  Fastmean.exe -dir "working-directory" -s "script.txt"
+  Fastmean.exe -o "circuit.scm" -s "script.txt"
+  Fastmean.exe -o "circuit.scm" -sim [-exit]
+  Fastmean.exe -o "circuit.scm" -ac [-exit]
+
+The PDF prints typographic dashes; actual command-line arguments should use
+ASCII hyphens. -sim starts transient analysis; -ac starts frequency analysis;
+-exit closes FASTMEAN after the calculation. The manual does not document a
+headless flag, stdout data protocol, process exit-code contract, COM, ActiveX,
+DDE or an Automation object model. This does not prove no internal interface
+exists; the supported integration evidenced here is the CLI and script file.
+
+Working directories (page 32): initial folder is Fastmean.exe's folder; -dir
+sets the working folder; -o changes it to the opened circuit's folder; starting
+-s changes it to the script's folder. Relative script paths are resolved there
+until a cd command. Absolute paths avoid this dependency.
+
+Script command reference (pages 33-34)
+-------------------------------------
+Commands use NO leading period. Semicolons separate commands; % starts a comment
+through the end of its line. Quote filenames/expressions containing spaces.
+Use ordinary ASCII quotation marks in generated scripts. The PDF examples use
+smart quotes for typography and contain a missing semicolon in one save_as
+example; generated scripts should terminate every command consistently.
+
+  cd "directory";
+  open "circuit.scm";
+  save;
+  save_as "new-circuit.scm";
+  save_netlist "elements.txt";
+  write "samples.txt" expression1 expression2 ... expressionN;
+  write after time_expression;
+  define function_or_variable_definition;
+  set element.parameter = expression;
+  set variable = expression;
+  element.parameter = expression;
+  sim tmax=expression step=expression eps=value sv2scheme=yes|no;
+  ac fmin=expression fmax=expression numpts=expression;
+  exit;
+
+Transient aliases: end_time, tmax and tend; time_step and step. eps is accuracy.
+sv2scheme=yes copies final state-variable values into circuit initial conditions.
+Missing sim arguments inherit saved circuit settings. The documented syntax
+does not specify numeric minimum/maximum validation limits.
+
+AC aliases: fmin/fstart, fmax/fend, numpts/pts. Missing ac arguments inherit saved
+circuit settings. There is no documented script option for logarithmic versus
+linear sweep; that setting belongs to the saved circuit/UI. There is also no
+documented symbolic-analysis or graph-image-export script command.
+
+Example generated transient script, requiring a circuit with OUT and R1:
+  open "circuit.scm";
+  write "samples.txt" t U(OUT) I(R1);
+  sim tmax=10m step=1u eps=10u sv2scheme=no;
+  exit;
+
+Example AC expressions are f, MAG(U(OUT)/U(IN)), dB(U(OUT)/U(IN)), and
+PHS(U(OUT)/U(IN)). The caller must choose actual existing element/port names.
+
+Native numeric export and plotting
+----------------------------------
+Page 31 documents the schematic Text directives:
+  .write "output.txt" expression1 expression2 ... expressionN;
+  .write after expression
+The script equivalents above omit the leading period. The result is a text
+table of floating-point numbers, one calculation point per row. The manual does
+not specify a CSV delimiter, column header format or numeric output precision;
+the MCP must inspect actual output instead of assuming comma-separated CSV.
+
+write after applies globally to all write directives and filters times before
+the specified threshold. Only one such directive should exist per circuit.
+The caller is responsible for unique output filenames across write directives.
+
+Page 19: transient settings expose end time, calculation step and EPS. To request
+approximately N steps, enter tmax/N as the step expression. There is no longer a
+separate choice between a point count and step. Example screenshot settings are
+tmax=1m, step=tmax/100, EPS=1m; these are examples, not specified default values.
+
+Page 20: AC start frequency, end frequency and point count accept mathematical
+expressions. Example screenshot shows 1 Hz, 1M Hz, 100 points and logarithmic
+sweep. Transient and AC dialogs support 30 expressions with 7 visible rows.
+Page 21: native graph axes can toggle linear/log scale and preserve zoom history.
+
+Installed 6.1 static graph-related strings identify a Save data command and text
+export filters *.txt and *.fra (frequency-response data), plus a Copy command.
+No BMP/PNG/JPEG graph-file export command was established by these sources.
+The MCP may render PNG plots from numbers calculated/exported by FASTMEAN, but
+must label them as plots of native FASTMEAN data rather than native GUI captures.
+A real screenshot of FASTMEAN is a separate output and needs an actual capture.
+
+Expressions and units (manual pages 7-11, 27-28)
+------------------------------------------------
+Element/variable identifiers are case-sensitive; function names are not.
+Parameter references require a named parameter, e.g. R1.R or L1.L, not R1/L1.
+Numbers use decimal point. Engineering suffixes: p=1e-12, n=1e-9, u=1e-6,
+m=1e-3, k=1e3, M=1e6, G=1e9; uppercase M and lowercase m differ.
+Operators are + - * / ^ with parentheses; constants include e and PI.
+Variables t and f represent time and frequency. Complex inputs use i or j.
+
+Signals include U(element_or_node), I(element), P(element); transient-only
+stored energy W(...). Complex results should be explicitly reduced with RE,
+IM, MAG, PH or PHS. If not reduced, the displayed real part is used. dB(z) is
+20*lg(abs(z)); PH/PHS return degrees and PHS unwraps 360-degree discontinuities.
+Other documented functions include sin/cos/tan/cot, their inverses, hyperbolic
+functions, ln/lg, exp/abs/sqrt/pow, limit, max/min, floor/round/mod, last,
+AVG/RMS, FFT, wnd, and transient harmonic-extraction tmag/tph/tre/tim.
+
+Element parameter expressions are evaluated once at the start of each analysis
+and cannot depend on time, currents or voltages. Logical elements do not support
+this general parameter-expression feature. .define/.def on a schematic defines
+variables/functions. An example symbolic export sets p=i*2*PI*f before defining
+the formula, permitting frequency plots of the derived expression in FASTMEAN.
+
+Symbolic/equation scope
+----------------------
+Manual pages 22-23 document Laplace-domain currents/voltages and, since 6.0,
+ratios yielding transfer functions, impedances and admittances. Named ports can
+be test points. Output supports copying as ordinary text, Maple text, .define
+text, or an image. The official page identifies the SCAD/CIRSYM native core.
+This is symbolic linear-circuit analysis; no general arbitrary-equation solver
+or nonlinear symbolic solver is documented. The page lists passive R/L/C,
+transformers, independent/dependent sources, gyrators, op amps and summators
+among supported symbolic elements. Gain >=1e15 denotes an ideal op amp.
+
+The official page warns of sign conventions based on node ordering: voltages
+point from larger to smaller node number; resistor current uses that direction,
+while other element currents use the opposite direction. A consumer should
+retain native node/sign information rather than silently change formula signs.
+
+Native scheme format / constraints
+----------------------------------
+Pages 24-26 document YAML .scm files from version 6.0 onward, allowing external
+programmatic reading/writing/generation. Earlier files were binary and
+undocumented. The example contains Objects, endpoint-ID/pin Wires, TD settings
+and expressions. It is a partial example, not a complete normative schema.
+Pages 11-15 require a ground in every galvanically isolated island and discuss
+topology constraints. The installed DEMO dialog resource states a 50-element
+analysis limit, disabled undo/clipboard functions and periodic demo prompts.
+License/runtime behavior must be observed; the MCP must not bypass licensing.
+
+Static UI reference (installed 6.1; not a callable public API)
+-------------------------------------------------------------
+Main menu IDs: Open 40015; Save 40016; Save as 40013; Save netlist 40030;
+Transient 40039 (Ctrl+T); AC 60018 (Ctrl+F); DC 60040 (Ctrl+D); Symbolic 60113.
+TRANSDLG edit IDs: end time1036, step1038, EPS1045.
+ACFREQDLG edit IDs: fmin1088, fmax1089, points1037; sweep combobox1087.
+Both dialogs: first visible X/Y edits1121/1129, through row7 at1127/1135;
+graph-number edits1163..1169; OK1, Cancel2.
+Graph string resource IDs127/128 are Save data/Copy hints; dispatch semantics
+were not tested and should not be assumed from the string IDs alone.
+
+Adapter authoring and batch behavior (version 1.0.0)
+---------------------------------------------------
+New circuits support R/C/L and independent U/V sources. U nodes are [positive,
+negative]. Engineering values are converted to numeric SI. Ground is node 0.
+Components need kind/type, name, nodes[2] and value. ports maps an ASCII alias to
+a graph node, or lists aliases equal to node names. Numeric graph node labels
+need named external aliases: ports={"IN":"17","OUT":"31"}; analysis uses IN/OUT.
+
+Default layout uses adjacent components, physical wires and native CON corners
+and junctions. External/analysis ports occur once per alias. Use relayout to
+convert former port-stub diagrams, preview to inspect PNG/SVG, then open to view
+the actual native application. Preview is an MCP rendering, not a screenshot.
+For a reference drawing, create spec.layout may contain:
+  placements: {"R1":{"x":1000,"y":1000,"rotation":0}}
+  nodes: {"in":{"x":800,"y":1000}}
+  routes: {"in":[[[800,1000],[920,1000],[920,960]]]}
+  ports: {"in":{"x":680,"y":1000,"rotation":2}}
+Coordinates are integers on a 20-unit grid. Rotation is clockwise 0..3;
+R/C/L pin1 points west/north/east/south respectively. U pin1 is negative.
+Explicit polylines must be orthogonal and connected through their node anchor.
+Component overlaps, collinear different-net wires, and ambiguous crossing
+junctions are rejected before SCM output. Plain perpendicular wire crossings
+are unconnected. Review labels and overall appearance after generation; this
+router does not guarantee a perfect arbitrary graph or reference-image clone.
+The attributed Point75A example contains 25 published RLC elements plus one
+source and three resistive test loads, with explicit compact reference layout.
+
+AC sampling is explicitly log or linear. Omitted signals use only active saved
+traces with the expected f/t x axis; disabled stale rows are excluded. Custom
+saved XY plots require explicit signals for both expressions. Batch charts use
+frequency/time on the x axis; data can be retrieved separately for XY plotting.
+In a native batch check, a saved definition p=i*2*PI*f produced no requested
+complex columns. An explicitly chosen working-copy variant using
+p=sqrt(-1)*2*PI*f matched an independent complex oracle. The adapter does not
+silently rewrite user expressions; malformed/missing columns are errors.
+
+Numeric results persist in private runs with manifests, full CSV and PNG;
+tool output is bounded. list_runs/get_result recover runs, read_data pages CSV,
+and artifact MCP resources expose registered outputs only. Cancellation stops
+only the adapter's own calculation processes. Existing GUI windows are left
+open. No Windows locale, security setting or proprietary binary is modified.
+Portable tests and opt-in native integration tests are included in tests/.
