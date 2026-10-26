@@ -183,6 +183,43 @@ class PlottingTests(unittest.TestCase):
             self.assertGreaterEqual(box.y0, 0)
             self.assertLessEqual(box.y1, height)
 
+    def test_long_panel_label_and_six_metrics_do_not_overlap_or_leave_the_canvas(self):
+        from matplotlib.figure import Figure
+        plan = prepare_plot(self.store, self.record["run_id"], panels=[
+            {"signal": "U(out)", "label": "W" * 80, "unit": "W" * 24,
+             "metrics": ["rms", "mean", "peak", "min", "max", "peak_to_peak"]},
+            {"signal": "I(RL)", "label": "Load current", "unit": "mA", "scale": 1000}],
+            title="Panel text layout regression")
+        original = Figure.savefig
+        checked = []
+
+        def inspect_saved(figure, path, **kwargs):
+            original(figure, path, **kwargs)
+            if kwargs.get("format") == "png":
+                renderer = figure.canvas.get_renderer()
+                previous = None
+                for axis in figure.axes:
+                    titles = [artist for artist in (axis._left_title, axis._right_title, axis.title)
+                              if artist.get_text()]
+                    boxes = [artist.get_window_extent(renderer) for artist in titles]
+                    for index, box in enumerate(boxes):
+                        self.assertGreaterEqual(box.x0, 0)
+                        self.assertLessEqual(box.x1, figure.bbox.width)
+                        self.assertGreaterEqual(box.y0, 0)
+                        self.assertLessEqual(box.y1, figure.bbox.height)
+                        for other in boxes[index + 1:]:
+                            self.assertFalse(box.overlaps(other), "Panel name and measurement text overlap")
+                        if previous is not None:
+                            self.assertLessEqual(box.y1, previous.y0, "Text intrudes on the preceding graph")
+                    previous = axis.get_window_extent(renderer)
+                checked.append(True)
+
+        job = self.root / "long-panel-label"
+        job.mkdir()
+        with patch.object(Figure, "savefig", inspect_saved):
+            render_plot(plan, job)
+        self.assertTrue(checked)
+
 
 class NativeTableSecurityTests(unittest.TestCase):
     def setUp(self):
@@ -211,18 +248,27 @@ class NativeTableSecurityTests(unittest.TestCase):
                                          columns=["t", "U(out)"], contents=contents)
         artifact = next(item for item in record["artifacts"] if item["name"] == "data.csv")
         self.assertGreater(artifact["size"], MAX_READ_BYTES)
-        self.assertNotIn("sha256", artifact)
+        self.assertIn("sha256", artifact)
+        # Releases before 1.2.1 omitted the large CSV's catalog hash. Preserve
+        # pagination/replotting of those runs using their original manifest.
+        result_path = self.root / record["run_id"] / "mcp-result.json"
+        saved = json.loads(result_path.read_text(encoding="utf-8"))
+        next(item for item in saved["artifacts"] if item["name"] == "data.csv").pop("sha256")
+        result_path.write_text(json.dumps(saved), encoding="utf-8")
         with self.assertRaisesRegex(ArtifactError, "8 MiB"):
             self.store.read_artifact(record["run_id"], "data.csv")
         table = self.store.load_native_data(record["run_id"])
         self.assertEqual(table["row_count"], count)
         self.assertEqual(table["values"][0][-1], count - 1)
+        self.assertEqual(self.store.read_data(record["run_id"], limit=1)["csv_sha256"], artifact["sha256"])
         large_csv = self.root / record["run_id"] / "data.csv"
         with large_csv.open("r+b") as stream:
             stream.seek(-2, 2)
             stream.write(b"2")
         with self.assertRaisesRegex(ArtifactError, "SHA256"):
             self.store.load_native_data(record["run_id"])
+        with self.assertRaisesRegex(ArtifactError, "SHA256"):
+            self.store.read_data(record["run_id"], limit=1)
 
     def test_unpublished_paths_and_non_numeric_or_invalid_axes_are_rejected(self):
         for run_id in ("../numeric-fixture", "C:/outside", "unpublished"):

@@ -86,6 +86,55 @@ class SchematicTests(unittest.TestCase):
             edit_component_values(original, {"MOS1": 1}, self.root / "bad.scm")
         self.assertFalse((self.root / "bad.scm").exists())
 
+    def test_waveform_edit_changes_only_requested_fields_and_retains_custom_data(self):
+        from fastmean_mcp.schematic import _load, _write_document
+        for source_kind, quantity in (("U", "U"), ("I", "I")):
+            with self.subTest(source_kind=source_kind):
+                spec = example_circuit()
+                spec["components"][0]["kind"] = source_kind
+                original = self.root / f"{source_kind}-original.scm"
+                create_circuit(spec, original)
+                _, document, _ = _load(original)
+                obj = next(o for o in document["scm"]["Scheme"]["Objects"] if o["Name"] == "U1")
+                params = obj["Params"]
+                params["AC"].update({"F": 1234, "PHI0": 25, "Delay": .003, "FD": 7, "NP": 8})
+                params["USER"][quantity] = {"x": [0, .1, .3], "y": [0, 4, -2]}
+                params["native_extension"] = {"future_option": "preserve"}
+                _write_document(document, original, overwrite=True)
+                before = original.read_bytes()
+                expected = copy.deepcopy(params)
+                expected["AC"].update({quantity+"0": 2, "F": 2500})
+                result = edit_component_values(original, {"U1": {"value": 2,
+                    "waveform": {"kind": "sine", "frequency": 2500}}}, self.root / f"{source_kind}-edited.scm")
+                observed = next(c for c in result["components"] if c["name"] == "U1")["parameters"]
+                self.assertEqual(observed, expected)
+                self.assertEqual(original.read_bytes(), before)
+
+    def test_waveform_kind_switch_retains_other_modes_and_explicit_amplitude_priority(self):
+        from fastmean_mcp.schematic import _load, _write_document
+        source = self.root / "switch-source.scm"
+        create_circuit(example_circuit(), source)
+        _, document, _ = _load(source)
+        params = next(o for o in document["scm"]["Scheme"]["Objects"] if o["Name"] == "U1")["Params"]
+        params["PULSE"].update({"F": 4321, "Delay": .01})
+        params["DC"]["Delay"] = .02
+        _write_document(document, source, overwrite=True)
+        cases = [
+            ({"kind": "pulse", "high": 3, "low": -1, "duty_percent": 25},
+             3, "PULSE", {"UMAX": 3, "UMIN": -1, "K": 25}),
+            ({"kind": "dc", "amplitude": 6}, 1, "DC", {"U0": 6}),
+            ({"kind": "sine", "frequency": 2500, "phase": 45},
+             2, "AC", {"U0": 9, "F": 2500, "PHI0": 45}),
+        ]
+        for waveform, mode, section, changes in cases:
+            with self.subTest(waveform=waveform):
+                expected = copy.deepcopy(params)
+                expected["ST"] = mode
+                expected[section].update(changes)
+                result = edit_component_values(source, {"U1": {"value": 9, "waveform": waveform}},
+                                               self.root / f"switch-{mode}.scm")
+                self.assertEqual(next(c for c in result["components"] if c["name"] == "U1")["parameters"], expected)
+
     def test_no_overwrite_without_explicit_opt_in(self):
         path = self.root / "existing.scm"
         create_circuit(example_circuit(), path)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import csv
 import atexit
+from collections import deque
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -263,6 +264,54 @@ def prepare_copy(source: str | Path, destination: str | Path) -> Path:
     return _prepare_project(source, destination)[0]
 
 
+def _check_local_voltage_capacitor_loops(path: Path) -> None:
+    """Reject a documented native TD singularity without changing the circuit.
+
+    Only actual physical nodes of known independent voltage sources and
+    capacitors are used. Pure capacitor cycles are allowed. Each file is
+    checked locally; a cycle that crosses subcircuit boundaries is outside
+    this conservative preflight's scope.
+    """
+    summary = read_scheme(path)
+    capacitors, sources = [], []
+    for component in summary["components"]:
+        if component["native_type"] == 1001:
+            capacitors.append(component)
+        elif component["native_type"] == 2010:
+            sources.append(component)
+    graph: dict[str, list[tuple[str, str]]] = {}
+
+    def add(component):
+        a, b = component["nodes"]
+        graph.setdefault(a, []).append((b, component["name"]))
+        graph.setdefault(b, []).append((a, component["name"]))
+
+    for capacitor in capacitors:
+        add(capacitor)
+    for source in sorted(sources, key=lambda item: item["name"]):
+        a, b = source["nodes"]
+        pending = deque([a])
+        previous = {a: None}
+        while pending and b not in previous:
+            node = pending.popleft()
+            for neighbor, name in graph.get(node, []):
+                if neighbor not in previous:
+                    previous[neighbor] = (node, name)
+                    pending.append(neighbor)
+        if b in previous:
+            loop = [source["name"]]
+            node = b
+            while previous[node] is not None:
+                node, name = previous[node]
+                loop.append(name)
+            raise EngineError(
+                "Native transient preflight found a closed loop of ideal voltage sources and capacitors "
+                f"({', '.join(loop)}) in {path.name}. FASTMEAN does not support this transient topology; "
+                "model a finite source/internal or series resistance explicitly if physically appropriate. "
+                "No resistance was added and the source schematic was not modified. This preflight applies only to transient analysis.")
+        add(source)
+
+
 class _ExpressionParser:
     def __init__(self, tokens: list[str]):
         self.tokens, self.at = tokens, 0
@@ -347,7 +396,7 @@ def validate_signal(expression: Any) -> str:
     return canonical
 
 
-def _signals(signals: Any, source: Path) -> list[str]:
+def _signals(signals: Any, source: Path, axis: str) -> list[str]:
     if signals is None:
         summary = read_scheme(source)
         ports = summary["ports"]
@@ -357,12 +406,52 @@ def _signals(signals: Any, source: Path) -> list[str]:
         signals = [f"U({output})"]
     if not isinstance(signals, (list, tuple)) or not 1 <= len(signals) <= MAX_SIGNALS:
         raise EngineError(f"signals must contain 1 to {MAX_SIGNALS} mathematical expressions.")
-    return [validate_signal(value) for value in signals]
+    expressions = [validate_signal(value) for value in signals]
+    if len(set(expressions)) != len(expressions):
+        raise EngineError("signals must contain distinct expressions; duplicate CSV columns are ambiguous.")
+    if axis in expressions:
+        raise EngineError(f"Signal {axis!r} duplicates the independent axis column; it is already included in the result.")
+    return expressions
 
 
 def _check_cancelled(cancelled: threading.Event | None) -> None:
     if cancelled is not None and cancelled.is_set():
         raise EngineError("FASTMEAN request cancelled.")
+
+
+def _validate_requested_axis(rows: list[list[float]], analysis: str, request: dict) -> dict:
+    """Reject truncated or stale native output before publishing it as a result.
+
+    The native exporter writes adaptive TD samples, so only coverage is fixed
+    there. AC requests specify an entire uniform linear/logarithmic grid. A
+    successful process exit and increasing rows alone prove neither contract.
+    Relative tolerance accommodates the exporter's decimal rounding at any SI
+    scale; a fixed absolute tolerance would accept missing tiny time intervals.
+    """
+    start = request["fmin"] if analysis == "ac" else 0.0
+    end = request["fmax"] if analysis == "ac" else request["stop"]
+    if not math.isclose(rows[0][0], start, rel_tol=1e-9, abs_tol=0.0):
+        raise EngineError(f"Native {analysis} axis starts at {rows[0][0]:.17g}; requested {start:.17g}.")
+    if not math.isclose(rows[-1][0], end, rel_tol=1e-9, abs_tol=0.0):
+        raise EngineError(f"Native {analysis} axis ends at {rows[-1][0]:.17g}; requested {end:.17g}. The calculation is incomplete or inconsistent.")
+    if analysis == "ac":
+        points = request["points"]
+        if len(rows) != points:
+            raise EngineError(f"Native AC row count {len(rows)} does not match requested {points}.")
+        for index, row in enumerate(rows[1:-1], 1):
+            fraction = index / (points - 1)
+            if request["scale"] == "log":
+                # Interpolate logarithms rather than end/start, which can
+                # overflow even when both requested endpoints are finite.
+                expected = math.exp(math.log(start) * (1 - fraction) + math.log(end) * fraction)
+            else:
+                expected = start * (1 - fraction) + end * fraction
+            if not math.isclose(row[0], expected, rel_tol=1e-9, abs_tol=0.0):
+                raise EngineError(f"Native AC frequency at row {index + 1} does not match the requested {request['scale']} grid.")
+    return {"requested_start": start, "requested_end": end,
+            "observed_start": rows[0][0], "observed_end": rows[-1][0],
+            "coverage_verified": True,
+            "sampling_verified": request["scale"] if analysis == "ac" else "adaptive"}
 
 
 def parse_native_table(path: str | Path, columns: int, max_rows: int = MAX_TRANSIENT_STEPS + 1,
@@ -525,6 +614,19 @@ class Engine:
                              "saved_fft": False, "graph_windows": False,
                              "known_unicode_si_literals": "equivalent numeric SI values; listed per source model",
                              "subcircuit_models": "sanitized private copies"}})
+            if analysis == "transient":
+                manifest["transient_preflight"] = {
+                    "scope": "local ideal independent voltage-source/capacitor loops in each SCM; cross-subcircuit cycles and other singularities are not checked",
+                    "checked_models": [], "status": "checking"}
+                for asset in assets:
+                    private = Path(asset["private_path"])
+                    try:
+                        _check_local_voltage_capacitor_loops(private)
+                    except EngineError as error:
+                        manifest["transient_preflight"].update({"status": "rejected", "model_path": asset["source_path"]})
+                        raise EngineError(f"{error} Source model: {asset['source_path']}. Artifacts: {job}") from error
+                    manifest["transient_preflight"]["checked_models"].append(asset["source_path"])
+                manifest["transient_preflight"]["status"] = "passed"
             self._manifest(job, manifest)
         except Exception as error:
             manifest.update({"status": "cancelled" if cancelled is not None and cancelled.is_set() else "failed", "error": str(error)})
@@ -668,18 +770,21 @@ class Engine:
                 raise EngineError("Native AC data has a non-positive frequency.")
             if axis == "t" and rows[0][0] < 0:
                 raise EngineError("Native transient data has a negative time.")
+            axis_validation = _validate_requested_axis(rows, manifest["analysis"], manifest["request"])
             columns = [axis, *signals]
             csv_path, plot_path = job / "data.csv", job / "plot.png"
             _csv_file(csv_path, columns, rows, cancelled)
             _plot_file(plot_path, columns, rows, manifest["analysis"],
                        manifest["request"].get("scale", "linear"), cancelled)
             manifest.update({"status": "completed", "row_count": len(rows), "columns": columns,
+                             "axis_validation": axis_validation,
                              "native_data_sha256": _sha256(native), "csv_sha256": _sha256(csv_path),
                              "plot_sha256": _sha256(plot_path)})
             self._manifest(job, manifest)
             return {**self._result(job, manifest), "analysis": manifest["analysis"], "data_path": str(native),
                     "csv_path": str(csv_path), "plot_path": str(plot_path), "columns": columns,
                     "row_count": len(rows), "rows": rows,
+                    "axis_validation": axis_validation,
                     "plot_provenance": manifest["plot_provenance"]}
         except BaseException as error:
             manifest.update({"status": "cancelled" if (cancelled is not None and cancelled.is_set())
@@ -701,7 +806,7 @@ class Engine:
         if scale not in {"log", "linear"}:
             raise EngineError("AC scale must be 'log' or 'linear'.")
         source = Path(path).expanduser().resolve(strict=True)
-        expressions = _signals(signals, source)
+        expressions = _signals(signals, source, "f")
         cancelled = self._begin_request()
         try:
             job, manifest = self._job(source, "ac", cancelled)
@@ -727,7 +832,7 @@ class Engine:
         if not 0 < accuracy <= .1:
             raise EngineError("Transient eps must satisfy 0 < eps <= 0.1.")
         source = Path(path).expanduser().resolve(strict=True)
-        expressions = _signals(signals, source)
+        expressions = _signals(signals, source, "t")
         cancelled = self._begin_request()
         try:
             job, manifest = self._job(source, "transient", cancelled)

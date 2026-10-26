@@ -1,5 +1,62 @@
 # Validation history
 
+## 1.2.1: preservation, result integrity and native failure detection
+
+Local Windows / FASTMEAN 6.1 on 2026-10-27: **220 passed, 5 skipped,
+285 subtests**, 74.12 seconds. After a final axis-column collision guard,
+the complete engine tests passed again: **24 passed, 48 subtests**. The final
+portable suite with FASTMEAN intentionally absent passed **203 tests,
+22 skipped, 283 subtests**, 38.55 seconds. Existing platform/policy skips
+remain; no Windows settings were changed.
+
+The normal installer upgraded the owned environment to **1.2.1** after a dry
+run. Doctor initialized the installed server through real stdio, discovered
+**21 tools** and successfully called status. The Codex configuration remained
+byte-for-byte unchanged during this upgrade.
+
+- Editing a hierarchical circuit now copies and registers its complete model
+  tree. Repeated/nested definitions remain reusable after the source folder is
+  unavailable. For external or absolute references, only the necessary model
+  paths and requested fields change; original native settings, custom fields
+  and literals are preserved. Waveform edits retain omitted phase/delay,
+  user-defined curves and inactive source modes. Explicit amplitude/high takes
+  precedence over the supplied base value, as during circuit creation.
+- Repeated annotation places new notes after the full extent of existing
+  multiline TEXT. Plot panel names and metric summaries wrap on separate lines;
+  regression checks inspect actual rendered text bounds.
+- Paged CSV reads authenticate the whole file, even outside the selected page.
+  Large CSVs use streaming SHA256, with the old native-manifest fallback for
+  pre-1.2.1 catalogues. Inline images follow the registered resource reader's
+  integrity checks. Malformed catalogues produce a domain error. All **327**
+  existing local result records passed the stricter catalogue validation.
+- Native completion now requires the requested axis interval and AC sampling
+  grid. Duplicate expressions and signal/axis name collisions are rejected
+  before launch. Symbolic output probes must connect to electrical components;
+  missing CIRSYM executable/settings files are reported before netlist export.
+- TD checks each private SCM for a local loop containing only ideal independent
+  voltage sources and capacitors and at least one voltage source. This is a
+  documented FASTMEAN transient limitation, not a netlist repair. Pure capacitor
+  cycles are allowed by this check; cross-subcircuit cycles and other singular
+  topologies are outside its scope. No implicit resistance or model change is
+  introduced.
+
+Real official-SDK stdio checks exercised create/project/edit/inspect/preview,
+native AC/TD, pagination and plotting without desktop automation. An edited
+hierarchical divider produced the independently expected gain **2/3** at all
+five AC points. The ideal compensated-divider TD request was rejected without
+creating a native process, while its sine-excited AC gain remained **0.1**.
+A separate, explicitly modified fixture with **100 ohm** source resistance
+completed TD; its 5,004 samples agreed with the finite-rise analytical response
+within **8.87e-13 V**. Earlier timeout reports remain historical evidence for the
+unmodified ideal circuit, not successful TD results.
+
+The complete four-BJT example was freshly rebuilt and calculated through MCP:
+31,204 adaptive native samples covered exactly 0–0.30 s, with **25.002515 V RMS,
+20.002012 A RMS and 500.100725 W** on 0.29–0.30 s. Its root SCM matched the
+published example byte-for-byte. The returned MCP graph was visually checked;
+the existing model/SOA/thermal limitations still apply. Hosted CI is separate
+from these local checks and is available through the repository workflow.
+
 ## 1.2.0: saved-data plotting, current sources and reference layouts
 
 Local Windows / FASTMEAN 6.1 checks on 2026-10-26: **196 passed, 5 skipped,

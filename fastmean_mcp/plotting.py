@@ -234,26 +234,35 @@ def render_plot(plan: dict, job: Path) -> dict:
             "svg.fonttype": "none", "svg.hashsalt": "fastmean-mcp-chart-v1",
             "axes.spines.top": False, "axes.spines.right": False}):
         count = len(spec["panels"])
-        figure = Figure(figsize=(10.8, max(3.7, 2.0 * count + 2.0)), dpi=120,
+        titles, heights = [], []
+        for panel, result in zip(spec["panels"], measurements["signals"]):
+            label = panel["signal"] if panel["label"] is None else f"{panel['label']} · {panel['signal']}"
+            label = textwrap.fill(textwrap.shorten(label, width=100, placeholder="…"), width=64,
+                                  break_on_hyphens=False)
+            suffix = f" {panel['unit']}" if panel["unit"] else ""
+            caption = textwrap.fill("  ·  ".join(f"{name}: {value:.6g}{suffix}"
+                for name, value in result["display_metrics"].items()), width=64, break_on_hyphens=False)
+            title = label + ("\n" + caption if caption else "")
+            titles.append(title)
+            heights.append(2.0 + .18 * max(0, len(title.splitlines()) - 2))
+        figure = Figure(figsize=(10.8, max(3.7, sum(heights) + 2.0)), dpi=120,
                         facecolor="white", layout="constrained")
         FigureCanvasAgg(figure)
         try:
-            axes = figure.subplots(count, 1, squeeze=False, sharex=True)[:, 0]
-            for axis, panel, series, result in zip(axes, spec["panels"], plan["series"], measurements["signals"]):
+            axes = figure.subplots(count, 1, squeeze=False, sharex=True,
+                                   gridspec_kw={"height_ratios": heights})[:, 0]
+            for axis, panel, series, result, title in zip(axes, spec["panels"], plan["series"], measurements["signals"], titles):
                 xs, ys = _decimate(series["x"], series["y"])
                 axis.plot([value * spec["x_scale"] for value in xs],
                           [value * panel["scale"] for value in ys], color=panel["color"], linewidth=1.5)
                 if spec["x_axis_scale"] == "log":
                     axis.set_xscale("log")
-                label = panel["signal"] if panel["label"] is None else f"{panel['label']} · {panel['signal']}"
-                axis.set_title(textwrap.shorten(label, width=85, placeholder="…"), loc="left", fontsize=9, parse_math=False)
-                captions = []
-                for name, value in result["display_metrics"].items():
-                    suffix = f" {panel['unit']}" if panel["unit"] else ""
-                    captions.append(f"{name}: {value:.6g}{suffix}")
-                caption = textwrap.fill("  ·  ".join(captions), width=78)
-                axis.set_title(caption, loc="right", fontsize=9, color=panel["color"], parse_math=False)
-                axis.set_ylabel(panel["unit"] or "Native value", fontsize=9, parse_math=False)
+                # A left/right pair of titles shares the same baseline and can
+                # overlap even for valid labels. Stack their text and allocate
+                # vertical space for wrapped metrics instead of clipping it.
+                axis.set_title(title, loc="left", fontsize=9, parse_math=False)
+                axis.set_ylabel(textwrap.fill(panel["unit"] or "Native value", width=12,
+                                              break_on_hyphens=False), fontsize=9, parse_math=False)
                 axis.set_xlim(*(value * spec["x_scale"] for value in spec["display_window"]))
                 axis.grid(True, which="both", color="#e2e8f0", alpha=.9)
                 axis.tick_params(labelsize=9)

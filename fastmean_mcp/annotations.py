@@ -13,7 +13,7 @@ import os
 from pathlib import Path, PureWindowsPath
 import re
 import tempfile
-from typing import Any
+from typing import Any, Callable
 
 from .engine import MAX_MODEL_FILES, MAX_PROJECT_BYTES, MAX_SIGNALS, _dependency_path, prepare_copy, validate_signal
 from .schematic import SchemeError, _load, _summarize, _write_document, parse_value
@@ -141,7 +141,27 @@ def _text_objects(document: dict, parameters: dict, descriptions: list[str], bin
     # The native YAML reader stores object coordinates as integers, even
     # though Matplotlib previews accept fractional coordinates.
     x = int(round(min((point[0] for point in coordinates), default=0)))
-    y = math.ceil(max((point[1] for point in coordinates), default=0)) + 120
+    bottom = max((point[1] for point in coordinates), default=0)
+    for obj in objects:
+        if obj.get("Type") != 900:
+            continue
+        top = obj.get("Y")
+        params = obj.get("Params") or {}
+        text = params.get("Text")
+        if not isinstance(top, (int, float)) or not math.isfinite(top) or not isinstance(text, str):
+            continue
+        font = params.get("Font") or {}
+        height = font.get("lfHeight", -16) if isinstance(font, dict) else -16
+        if isinstance(height, bool) or not isinstance(height, (int, float)) or not math.isfinite(height):
+            height = -16
+        line_height = max(22, math.ceil(abs(height) * 1.375))
+        # Existing multiline notes occupy space below their anchor. In
+        # particular a previous .parameter block can exceed the 120-unit gap.
+        extent = line_height * max(1, len(text.splitlines()))
+        if obj.get("Rot", 0):
+            extent = max(extent, abs(height) * max((len(line.expandtabs(8)) for line in text.splitlines()), default=0))
+        bottom = max(bottom, top + extent)
+    y = math.ceil(bottom) + 120
     texts = []
     entries = list(parameters.items())
     units: dict[str, set[str]] = {}
@@ -230,6 +250,21 @@ def annotate_circuit(source_path: str | Path, output_path: str | Path,
     per-instance parameter overrides are not authored. Expressions are validated
     mathematics, not script fragments. Existing analysis settings are retained.
     """
+    return _copy_circuit(source_path, output_path, parameters, bindings, descriptions,
+                         td_signals, fd_signals)
+
+
+def _copy_circuit(source_path: str | Path, output_path: str | Path,
+                  parameters: dict | None = None, bindings: dict | None = None,
+                  descriptions: list[str] | None = None, td_signals: list[str] | None = None,
+                  fd_signals: list[str] | None = None, *,
+                  root_transform: Callable[[dict], None] | None = None) -> dict[str, Any]:
+    """Publish a complete portable copy, optionally changing its staged root.
+
+    The internal transform runs before publication, so value editing shares the
+    same dependency snapshot, exclusive creation and rollback guarantees as
+    annotation. It is never exposed as a protocol argument.
+    """
     source = Path(source_path).expanduser().resolve(strict=True)
     output = Path(output_path).expanduser().absolute()
     if output.suffix.lower() != ".scm":
@@ -284,9 +319,11 @@ def annotate_circuit(source_path: str | Path, output_path: str | Path,
         for original_path, private_path in copied_pairs.items():
             if portable and original_path != source:
                 continue
-            _, document, _ = _load(private_path)
-            if portable:
-                document = copy.deepcopy(original)
+            # Preparation validates directives and every dependency but its
+            # batch copy suppresses UI/state settings and normalizes literals.
+            # Authoring must retain the original document, changing only the
+            # requested root fields and references to the packaged models.
+            document = copy.deepcopy(records[original_path]["document"])
             body = document["scm"]
             if original_path == source:
                 for section in _ANALYSIS:
@@ -309,9 +346,12 @@ def annotate_circuit(source_path: str | Path, output_path: str | Path,
                     settings["ExprRowOffset"] = 0
                     settings["Expressions"] = [{"plot": index+1, "x": "t" if section == "TD" else "f", "y": signal}
                                                for index, signal in enumerate(signals)]
+                if root_transform is not None:
+                    root_transform(document)
             for obj in body["Scheme"].get("Objects") or []:
                 if obj["Type"] == 7100 and not portable:
-                    child = _dependency_path(private_path.parent, obj["Params"]["FileName"])
+                    original_child = _dependency_path(original_path.parent, obj["Params"]["FileName"])
+                    child = copied_pairs[original_child]
                     obj["Params"]["FileName"] = Path(os.path.relpath(child, private_path.parent)).as_posix()
             _summarize(document, private_path, "utf-8")
             _write_document(document, private_path, overwrite=True)

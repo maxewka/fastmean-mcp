@@ -147,6 +147,147 @@ class EngineSafetyTests(unittest.TestCase):
                     call()
             launch.assert_not_called()
 
+    def test_duplicate_signal_columns_rejected_before_creating_a_job(self):
+        engine = Engine(self.app, self.root / "jobs")
+        with patch("fastmean_mcp.engine.subprocess.Popen") as launch:
+            for signals in (["U(out)", "U(out)"], ["U(out) + 1", "U(out)+1"]):
+                with self.subTest(signals=signals), self.assertRaisesRegex(EngineError, "distinct"):
+                    engine.run_ac(self.source, signals)
+                with self.subTest(signals=signals), self.assertRaisesRegex(EngineError, "distinct"):
+                    engine.run_transient(self.source, signals)
+            with self.assertRaisesRegex(EngineError, "axis column"):
+                engine.run_ac(self.source, ["f"])
+            with self.assertRaisesRegex(EngineError, "axis column"):
+                engine.run_transient(self.source, [" t "])
+            launch.assert_not_called()
+        self.assertEqual(list(engine.output_dir.iterdir()), [])
+
+    def test_incomplete_or_wrong_native_axis_is_failed_before_rendering(self):
+        engine = Engine(self.app, self.root / "jobs")
+        cases = [
+            ("transient", {"stop": .005}, [0, .001, .004], "ends"),
+            ("transient", {"stop": .005}, [.001, .004, .005], "starts"),
+            ("transient", {"stop": .005}, [0, .001, .006], "ends"),
+            # Tiny SI times must not slip through a fixed absolute tolerance.
+            ("transient", {"stop": 1e-15}, [0, 1e-16], "ends"),
+            ("ac", {"fmin": 1, "fmax": 1000, "points": 4, "scale": "log"},
+             [1, 334, 667, 1000], "grid"),
+            ("ac", {"fmin": 1, "fmax": 1000, "points": 4, "scale": "linear"},
+             [1, 10, 100, 1000], "grid"),
+            ("ac", {"fmin": 1, "fmax": 1000, "points": 4, "scale": "log"},
+             [2, 20, 200, 2000], "starts"),
+        ]
+        for analysis, request, axis, message in cases:
+            with self.subTest(analysis=analysis, request=request, axis=axis):
+                job, manifest = engine._job(self.source, analysis)
+                manifest["request"] = request
+                (job / "native_data.txt").write_text("\n".join(f"{value:.17g} 1" for value in axis), encoding="ascii")
+                with patch("fastmean_mcp.engine._plot_file") as render:
+                    with self.assertRaisesRegex(EngineError, message):
+                        engine._complete_data(job, manifest, ["U(out)"], "f" if analysis == "ac" else "t", 10)
+                    render.assert_not_called()
+                self.assertEqual(json.loads((job / "manifest.json").read_text())["status"], "failed")
+                self.assertFalse((job / "data.csv").exists())
+
+    def test_native_axis_accepts_adaptive_samples_and_decimal_rounding(self):
+        engine = Engine(self.app, self.root / "jobs")
+        cases = [
+            ("transient", {"stop": .005}, [0, 1e-9, 1e-6, .003, .0050000000001]),
+            ("transient", {"stop": 1e-15}, [0, 1e-20, 1e-17, 1e-15]),
+            ("ac", {"fmin": 1, "fmax": 1000, "points": 4, "scale": "log"},
+             [1, 10.00000000001, 99.99999999999, 1000]),
+            ("ac", {"fmin": 1, "fmax": 1000, "points": 4, "scale": "linear"},
+             [1, 334, 667, 1000]),
+            ("ac", {"fmin": 1e-300, "fmax": 1e300, "points": 3, "scale": "log"},
+             [1e-300, 1, 1e300]),
+        ]
+        for analysis, request, axis in cases:
+            with self.subTest(analysis=analysis, request=request):
+                job, manifest = engine._job(self.source, analysis)
+                manifest["request"] = request
+                (job / "native_data.txt").write_text("\n".join(f"{value:.17g} 1" for value in axis), encoding="ascii")
+                def render(path, *args):
+                    path.write_bytes(b"test image")
+                with patch("fastmean_mcp.engine._plot_file", side_effect=render):
+                    result = engine._complete_data(job, manifest, ["U(out)"], "f" if analysis == "ac" else "t", 10)
+                self.assertTrue(result["axis_validation"]["coverage_verified"])
+                saved = json.loads((job / "manifest.json").read_text())
+                self.assertEqual(saved["status"], "completed")
+                self.assertEqual(saved["axis_validation"], result["axis_validation"])
+
+    def test_transient_preflight_rejects_voltage_capacitor_loops_without_native_launch(self):
+        cases = [
+            [{"kind": "C", "name": "Cinput", "nodes": ["in", "out"], "value": 1e-9}],
+            [{"kind": "U", "name": "U2", "nodes": ["in", "out"], "value": 1}],
+            [{"kind": "U", "name": "U2", "nodes": ["in", "0"], "value": 1}],
+        ]
+        engine = Engine(self.app, self.root / "jobs")
+        for index, extra in enumerate(cases):
+            spec = example_circuit()
+            spec["components"].extend(extra)
+            if index == 2:
+                spec["layout"] = {"placements": {
+                    "U1": {"x": 600, "y": 1000, "rotation": 3},
+                    "U2": {"x": 800, "y": 1000, "rotation": 3},
+                    "R1": {"x": 1000, "y": 800, "rotation": 0},
+                    "C1": {"x": 1200, "y": 1000, "rotation": 1}}}
+            source = self.root / f"loop{index}.scm"
+            create_circuit(spec, source)
+            before = digest(source)
+            with self.subTest(extra=extra), patch("fastmean_mcp.engine.subprocess.Popen") as launch:
+                with self.assertRaisesRegex(EngineError, "closed loop.*U1"):
+                    engine.run_transient(source, ["U(out)"])
+                launch.assert_not_called()
+            self.assertEqual(digest(source), before)
+            # AC is explicitly outside the transient-only restriction.
+            _, ac_manifest = engine._job(source, "ac")
+            self.assertEqual(ac_manifest["status"], "prepared")
+        rejected = [json.loads(path.read_text()) for path in engine.output_dir.glob("*/manifest.json")
+                    if path.parent.name.endswith("transient")]
+        self.assertEqual(len(rejected), len(cases))
+        for manifest in rejected:
+            self.assertEqual(manifest["status"], "failed")
+            self.assertEqual(manifest["transient_preflight"]["status"], "rejected")
+            self.assertNotIn("owned_pid", manifest)
+
+    def test_transient_preflight_allows_capacitor_only_loops_and_series_resistance(self):
+        spec = example_circuit()
+        spec["components"].extend([
+            {"kind": "C", "name": "C2", "nodes": ["out", "mid"], "value": 1e-9},
+            {"kind": "C", "name": "C3", "nodes": ["mid", "0"], "value": 2e-9}])
+        source = self.root / "capacitor_loop.scm"
+        create_circuit(spec, source)
+        engine = Engine(self.app, self.root / "jobs")
+        _, manifest = engine._job(source, "transient")
+        self.assertEqual(manifest["transient_preflight"]["status"], "passed")
+        self.assertEqual(len(manifest["transient_preflight"]["checked_models"]), 1)
+        # Existing ordinary RC, RLC and transistor models remain admitted.
+        rlc = self.root / "rlc.scm"
+        create_circuit(example_circuit("rlc_lowpass"), rlc)
+        engine._job(rlc, "transient")
+        amplifier = Path(__file__).resolve().parents[1] / "examples/four-bjt-amplifier/Amplifier_4BJT.scm"
+        _, manifest = engine._job(amplifier, "transient")
+        self.assertEqual(manifest["transient_preflight"]["status"], "passed")
+        self.assertEqual(len(manifest["transient_preflight"]["checked_models"]), 5)
+
+    def test_transient_preflight_checks_local_dependency_loops(self):
+        spec = example_circuit()
+        spec["components"].append({"kind": "C", "name": "C2", "nodes": ["in", "out"], "value": 1e-9})
+        child = self.root / "child.scm"
+        create_circuit(spec, child)
+        doc = yaml.safe_load(self.source.read_text(encoding="utf-8"))
+        doc["scm"]["Scheme"]["Objects"].append({"ID": 999, "Type": 7100, "Name": "MODEL1",
+                                                   "Params": {"FileName": "child.scm"}})
+        self.source.write_text(yaml.safe_dump(doc), encoding="utf-8")
+        engine = Engine(self.app, self.root / "jobs")
+        with patch("fastmean_mcp.engine.subprocess.Popen") as launch:
+            with self.assertRaisesRegex(EngineError, "closed loop"):
+                engine.run_transient(self.source, ["U(out)"])
+            launch.assert_not_called()
+        manifest = json.loads(next(engine.output_dir.glob("*/manifest.json")).read_text())
+        self.assertEqual(Path(manifest["transient_preflight"]["model_path"]).resolve(), child.resolve())
+        self.assertEqual(len(manifest["transient_preflight"]["checked_models"]), 1)
+
     def test_timeout_kills_only_the_process_created_for_this_job(self):
         engine = Engine(self.app, self.root / "jobs", timeout=.01)
         job, manifest = engine._job(self.source, "ac")

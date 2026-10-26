@@ -331,3 +331,26 @@ See docs/PLOTTING.md for complete examples and numerical limitations.
 fastmean_preview(include_text=false) can omit TEXT notes from an image and its
 fit bounds. Omitted counts are reported; original SCM and parameter expressions
 are retained. Default previews include all notes.
+
+Adapter reliability (version 1.2.1)
+----------------------------------
+edit_values preserves a hierarchical project's recursive model files in its new
+job and registers them as artifacts. Move the complete returned folder, not its
+root SCM alone. Original project files remain unchanged.
+
+Native results must cover the requested interval; AC points must also match the
+requested log/linear grid. Duplicate canonical signal expressions are rejected.
+TD preflight checks each private SCM for local closed paths consisting only of
+independent ideal voltage sources and capacitors, with at least one voltage
+source. The manual (pages 13-14) lists these among invalid transient topologies.
+The adapter rejects them before process creation and does not insert resistance
+or change values. Pure capacitor loops are not rejected by this check; cycles
+crossing subcircuit boundaries and other singularities remain outside its scope.
+AC remains a separate operation. A physically justified finite source/series
+resistance can be modeled explicitly by the caller when appropriate.
+
+read_data verifies the complete CSV SHA256 on every paged read and returns that
+digest. Inline PNGs use the same registered-artifact checks as resource reads;
+modified files are rejected. Long plot panel captions wrap separately from
+metric summaries. Symbolic probes must be electrically connected, and missing
+CIRSYM executable/settings files are reported before native netlist export.

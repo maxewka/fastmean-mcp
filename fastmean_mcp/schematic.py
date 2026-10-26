@@ -865,18 +865,10 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
     return summary
 
 
-def edit_component_values(source_path: str | Path, updates: dict, output_path: str | Path,
-                          overwrite: bool = False) -> dict:
-    """Change supported values while preserving native topology and other data.
-
-    updates maps existing component names to a number/SI string or to
-    {value: ..., waveform: ...}. Unknown/nonlinear component types are preserved
-    but cannot be edited by this helper. Source is not overwritten by default.
-    """
-    source, document, _ = _load(source_path)
+def _apply_value_edits(document: dict, updates: dict) -> None:
+    """Validate and apply root edits to an in-memory document only."""
     if not isinstance(updates, dict) or not updates:
         raise SchemeError("updates must map component names to new values.")
-    _summarize(document, source, "utf-8")
     objects = document["scm"]["Scheme"].get("Objects") or []
     by_name = {}
     for obj in objects:
@@ -899,7 +891,29 @@ def edit_component_values(source_path: str | Path, updates: dict, output_path: s
             obj.setdefault("Params", {})[kind] = value
         else:
             if "waveform" in patch:
-                obj["Params"] = _source_params(value, patch["waveform"], current=kind == "I")
+                # Validate against the complete known native template, but do
+                # not replace unrelated source modes, custom data or omitted
+                # phase/delay settings when editing one waveform field.
+                template = _source_params(value, patch["waveform"], current=kind == "I")
+                params = copy.deepcopy(obj.get("Params") or {})
+                section = {1: "DC", 2: "AC", 3: "PULSE"}[template["ST"]]
+                existing = params.get(section) or {}
+                if not isinstance(existing, dict):
+                    raise SchemeError(f"Source {name} has invalid {section} parameters.")
+                target = {**template[section], **existing}
+                quantity = "I" if kind == "I" else "U"
+                target[quantity + ("MAX" if section == "PULSE" else "0")] = value
+                aliases = {"amplitude": quantity+"0", "frequency": "F", "phase": "PHI0",
+                           "delay": "Delay", "high": quantity+"MAX", "low": quantity+"MIN",
+                           "duty_percent": "K", "rise_time": "TFR"}
+                for key in patch["waveform"] or {}:
+                    if key != "kind":
+                        native = aliases[key]
+                        # Explicit waveform amplitude/high takes precedence
+                        # over the base value, as it does during creation.
+                        target[native] = template[section][native]
+                params.update({"ST": template["ST"], section: target})
+                obj["Params"] = params
             else:
                 quantity = "I" if kind == "I" else "U"
                 obj.setdefault("Params", {}).setdefault("DC", {})[quantity+"0"] = value
@@ -908,6 +922,32 @@ def edit_component_values(source_path: str | Path, updates: dict, output_path: s
                     obj["Params"]["PULSE"][quantity+"MAX"] = value
                 if "TRIANG" in obj["Params"]:
                     obj["Params"]["TRIANG"][quantity+"MAX"] = value
+
+
+def edit_component_values(source_path: str | Path, updates: dict, output_path: str | Path,
+                          overwrite: bool = False) -> dict:
+    """Change supported root values while preserving topology and native data.
+
+    updates maps names to numbers/SI strings or {value: ..., waveform: ...}.
+    A hierarchical circuit is always published as a fresh portable dependency
+    tree; existing SCM/model destinations cannot be overwritten or merged.
+    """
+    source, document, _ = _load(source_path)
+    _summarize(document, source, "utf-8")
+    _apply_value_edits(document, updates)
+    if any(obj["Type"] == 7100 for obj in document["scm"]["Scheme"].get("Objects") or []):
+        from .annotations import _copy_circuit
+        # Validate edits before staging, then transform only the private root.
+        # Copying just its YAML would strand models/*.scm in the source job.
+        package = _copy_circuit(source, output_path,
+                                root_transform=lambda staged: _apply_value_edits(staged, updates))
+        result = read_scheme(package["path"])
+        for key in ("working_dir", "source_path", "source_sha256", "source_unchanged",
+                    "private_schematic_sha256", "source_models", "dependency_layout",
+                    "portability_note", "preview_unsupported", "dependency_paths"):
+            result[key] = package[key]
+        result["edited_components"] = list(updates)
+        return result
     _summarize(document, source, "utf-8")
     destination = _write_document(document, output_path, overwrite)
     result = _summarize(document, destination, "utf-8")

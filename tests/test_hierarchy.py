@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -209,6 +210,92 @@ class HierarchyTransactions(unittest.TestCase):
 
 
 class HierarchyAuthoring(unittest.TestCase):
+    def test_editing_external_model_tree_preserves_every_unrequested_native_field(self):
+        from fastmean_mcp.schematic import edit_component_values, _load, _write_document
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = Path(create_project(project_spec(), root / "project")["path"])
+            original_documents = {}
+            for path in source.parent.rglob("*.scm"):
+                _, document, _ = _load(path)
+                body = document["scm"]
+                body["TD"]["SVD"].update({"SVWriteFlag": 1, "SVWriteFileName": "user-state.sv"})
+                body["FD"]["ParamSweep"] = 1
+                body["CustomMetadata"] = {"retain": [1, "Russian SI literals", False]}
+                for obj in body["Scheme"]["Objects"]:
+                    if obj["Type"] == 1000:
+                        obj["Params"].update({"R": "1к", "custom_model_data": [1, 2, 3]})
+                    elif obj["Type"] == 7100 and path == source:
+                        obj["Params"]["FileName"] = str((path.parent / obj["Params"]["FileName"]).resolve())
+                _write_document(document, path, overwrite=True)
+                original_documents[path] = document
+            hashes = {path: digest(path) for path in original_documents}
+            destination = root / "edited"
+            destination.mkdir()
+            result = edit_component_values(source, {"RL": 8000}, destination / "main.scm")
+            self.assertEqual(result["dependency_layout"], "validated_private_assets")
+            for item in result["source_models"]:
+                old_path, new_path = Path(item["source_path"]), Path(item["private_path"])
+                expected = copy.deepcopy(original_documents[old_path])
+                _, observed, _ = _load(new_path)
+                for old, new in zip(expected["scm"]["Scheme"]["Objects"], observed["scm"]["Scheme"]["Objects"]):
+                    if old["Type"] == 7100:
+                        reference = Path(new["Params"]["FileName"])
+                        self.assertFalse(reference.is_absolute())
+                        self.assertTrue((new_path.parent / reference).is_file())
+                        old["Params"]["FileName"] = new["Params"]["FileName"]
+                    if old_path == source and old["Name"] == "RL":
+                        old["Params"]["R"] = 8000
+                self.assertEqual(observed, expected)
+                self.assertEqual(digest(old_path), hashes[old_path])
+
+    def test_root_value_edit_packages_nested_shared_models_and_survives_relocation(self):
+        from fastmean_mcp.engine import prepare_copy
+        from fastmean_mcp.schematic import edit_component_values, _load
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            project = create_project(project_spec(), root / "project")
+            source = Path(project["path"])
+            originals = {path: path.read_bytes() for path in source.parent.rglob("*.scm")}
+            edited = root / "edited"
+            edited.mkdir()
+            result = edit_component_values(source, {"RL": "8k"}, edited / "main.scm")
+            self.assertTrue(result["source_unchanged"])
+            self.assertEqual(len(result["dependency_paths"]), 2)
+            self.assertEqual(result["dependency_layout"], "original_relative_tree")
+            self.assertEqual(next(c for c in result["components"] if c["name"] == "RL")["value"], 8000)
+            for item in result["source_models"]:
+                old, new = Path(item["source_path"]), Path(item["private_path"])
+                self.assertEqual(old.read_bytes(), originals[old])
+                self.assertEqual(digest(new), item["private_sha256"])
+                if old != source:
+                    self.assertEqual(new.read_bytes(), originals[old])
+                _, doc, _ = _load(new)
+                for obj in doc["scm"]["Scheme"]["Objects"]:
+                    if obj["Type"] == 7100:
+                        reference = Path(obj["Params"]["FileName"])
+                        self.assertFalse(reference.is_absolute())
+                        self.assertTrue((new.parent / reference).is_file())
+            relocated = root / "relocated"
+            shutil.copytree(edited, relocated)
+            # Remove access to the original directory to prove the copy is
+            # self-contained, including repeated nested references.
+            source.parent.rename(root / "original-backup")
+            prepared = prepare_copy(relocated / "main.scm", root / "worker.scm")
+            self.assertTrue(prepared.is_file())
+
+    def test_invalid_root_edit_leaves_no_dependency_files(self):
+        from fastmean_mcp.schematic import edit_component_values
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = Path(create_project(project_spec(), root / "project")["path"])
+            destination = root / "edited"
+            destination.mkdir()
+            for updates in ({"RL": -1}, {"missing": 10}, {"FIRST": 1}):
+                with self.subTest(updates=updates), self.assertRaises(SchemeError):
+                    edit_component_values(source, updates, destination / "main.scm")
+                self.assertEqual(list(destination.iterdir()), [])
+
     def test_child_port_layout_matches_native_slots_not_input_mapping_order(self):
         from fastmean_mcp.schematic import _load
         spec = asymmetric_pin_spec()
@@ -327,6 +414,24 @@ class NativeComponentNormalization(unittest.TestCase):
 
 
 class HierarchyServerContract(unittest.TestCase):
+    def test_value_edit_registers_the_complete_private_model_tree(self):
+        from fastmean_mcp import server
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = Path(create_project(project_spec(), root / "project")["path"])
+            output = root / "runs"
+            with patch.dict(os.environ, {"FASTMEAN_OUTPUT_DIR": str(output),
+                                         "FASTMEAN_APP_DIR": str(root / "absent-app")}):
+                result = server.fastmean_edit_values(str(source), {"RL": "8k"})
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["analysis"], "edit")
+                self.assertEqual({item["relative_path"] for item in result["artifacts"] if item["name"].endswith(".scm")},
+                                 {"edited.scm", "models/PAIR.scm", "models/RES.scm"})
+                for artifact in result["artifacts"]:
+                    if artifact["name"].endswith(".scm"):
+                        content = server.store().read_artifact(result["run_id"], artifact["name"])
+                        self.assertEqual(content, (Path(result["working_dir"]) / artifact["relative_path"]).read_bytes())
+
     def test_project_publication_uses_direct_job_and_registers_nested_specs(self):
         from fastmean_mcp import server
         with tempfile.TemporaryDirectory() as temporary:

@@ -142,6 +142,23 @@ class AnnotationTests(unittest.TestCase):
         self.assertEqual((general["HPos"], general["VPos"]), (123, 456))
         self.assertEqual(digest(self.source), before)
 
+    def test_repeated_annotation_starts_below_existing_multiline_text(self):
+        long_note = "\n".join(f"Measurement note {index}" for index in range(20))
+        annotate_circuit(self.source, self.destination, descriptions=[long_note])
+        before = self.destination.read_bytes()
+        _, first, _ = _load(self.destination)
+        old_note = next(obj for obj in first["scm"]["Scheme"]["Objects"] if obj["Type"] == 900)
+        next_path = self.root / "annotated-again.scm"
+        annotate_circuit(self.destination, next_path, descriptions=["Additional measurement"])
+        _, second, _ = _load(next_path)
+        notes = [obj for obj in second["scm"]["Scheme"]["Objects"] if obj["Type"] == 900]
+        self.assertEqual(notes[0], old_note)
+        # Even the minimum native glyph height of every old row must fit
+        # before the newly added text begins (the old code used Y + 120).
+        native_height = abs(old_note["Params"]["Font"]["lfHeight"])
+        self.assertGreater(notes[1]["Y"], old_note["Y"] + native_height * len(long_note.splitlines()))
+        self.assertEqual(self.destination.read_bytes(), before)
+
     def test_invalid_requests_do_not_create_files(self):
         cases = [
             ({"parameters": {"bad;exit": 1}}, "ASCII"),

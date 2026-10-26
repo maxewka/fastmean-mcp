@@ -127,6 +127,15 @@ class NativeConversionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "floating"):
             cirsym_from_fastmean_netlist(NATIVE_EXPORTED_RC + "R2 3 4 1000\n")
 
+    def test_unconnected_output_port_does_not_invent_an_electrical_node(self):
+        netlist = NATIVE_EXPORTED_RC + "UNCONNECTED 42\n"
+        with self.assertRaisesRegex(ValueError, "existing nonground circuit node"):
+            cirsym_from_fastmean_netlist(netlist, output="UNCONNECTED")
+        with self.assertRaisesRegex(ValueError, "existing nonground circuit node"):
+            cirsym_from_fastmean_netlist(netlist, output="42")
+        # An unrelated unused port must not invalidate a connected probe.
+        self.assertIn("U_symbolic_output 2 0", cirsym_from_fastmean_netlist(netlist)["netlist"])
+
     def test_native_port_names_are_exact_and_not_casefolded_into_another_node(self):
         with self.assertRaisesRegex(ValueError, "not a native port"):
             cirsym_from_fastmean_netlist(NATIVE_EXPORTED_RC, input="in")

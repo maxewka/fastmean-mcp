@@ -183,13 +183,15 @@ def _with_image(result: dict, publish: bool = True) -> CallToolResult:
     contents: list[Any] = [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
     for artifact in result.get("artifacts", [])[:12]:
         contents.append(ResourceLink(name=artifact["name"], uri=artifact["uri"], mime_type=artifact.get("mime_type"), size=artifact.get("size")))
-    # Engine paths are generated internally; do not expose an arbitrary-file reader.
-    candidates = [v for k, v in result.items() if isinstance(v, str) and
-                  ("plot" in k or "png" in k) and v.lower().endswith(".png")]
-    for value in candidates[:1]:
-        path = Path(value).resolve()
-        if output_dir() in path.parents and path.is_file() and path.stat().st_size < 4_000_000:
-            contents.append(ImageContent(type="image", data=base64.b64encode(path.read_bytes()).decode("ascii"), mime_type="image/png"))
+    # Inline images have the same publication boundary and integrity checks as
+    # resource reads. Persisted absolute path hints can be stale or modified;
+    # they must never select a file from another job or bypass its digest.
+    for artifact in result.get("artifacts", []):
+        if (artifact.get("mime_type") == "image/png"
+                and type(artifact.get("size")) is int and artifact["size"] < 4_000_000):
+            data = store().read_artifact(result["run_id"], artifact["name"])
+            contents.append(ImageContent(type="image", data=base64.b64encode(data).decode("ascii"), mime_type="image/png"))
+            break
     return CallToolResult(content=contents, structured_content=result, is_error=result.get("ok") is False)
 
 
@@ -210,7 +212,8 @@ def fastmean_status() -> dict[str, Any]:
             "installation_error": installation_error,
             "executable": str(exe) if exe else None,
             "executable_sha256": hashlib.sha256(exe.read_bytes()).hexdigest() if exe else None,
-            "symbolic_available": bool(installation and (installation / "symbolic" / "cirsymw.exe").is_file()),
+            "symbolic_available": bool(installation and all(
+                (installation / "symbolic" / name).is_file() for name in ("cirsymw.exe", "human.sym"))),
             "output_directory": str(output_dir()), "windows_locale_modified": False, "active_operations": active,
             "native_operations": ["AC frequency response", "transient analysis", "netlist export", "CIRSYM symbolic linear analysis"],
             "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
@@ -343,10 +346,21 @@ def fastmean_edit_values(path: str, updates: dict) -> dict[str, Any]:
 
     updates maps component names to SI values, or to {value:...,waveform:...}.
     This supports R/C/L/U/I value edits and never overwrites the selected source.
+    Explicit waveform fields update the selected mode, retaining omitted fields
+    and other modes; waveform amplitude/high overrides value when supplied.
     """
     source = source_path(path)
     job = new_job("edit")
-    return store().publish(edit_component_values(source, updates, job / "edited.scm"))
+    result = edit_component_values(source, updates, job / "edited.scm")
+    dependencies = []
+    for value in result.get("dependency_paths", []):
+        private = Path(value).resolve(strict=True)
+        if not private.is_relative_to(job.resolve()) or private.suffix.lower() != ".scm":
+            raise ValueError("An edited dependency escaped its private SCM job.")
+        dependencies.append({"path": str(private)})
+    result.update({"working_dir": str(job), "analysis": "edit", "dependency_artifacts": dependencies,
+                   "ok": True, "origin": "Native SCM values edited by MCP; no analysis performed"})
+    return store().publish(result)
 
 
 @mcp.tool(annotations=WRITE)
@@ -417,10 +431,20 @@ async def fastmean_symbolic(path: str, output: str = "out", input: str | None = 
     kinds = {c["name"]: c["kind"] for c in summary["components"]}
     if summary["unsupported_type_ids"]:
         raise ValueError(f"Unsupported symbolic element types: {summary['unsupported_type_ids']}")
+    installation = app_dir()
+    for name in ("cirsymw.exe", "human.sym"):
+        required = installation / "symbolic" / name
+        if not required.is_file():
+            raise FileNotFoundError(f"Native symbolic analysis requires the installed file: {required}")
     def solve(native):
         exported = native.export_netlist(source)
         converted = cirsym_from_fastmean_netlist(exported["text"], output=output, input=input, component_kinds=kinds)
-        result = run_symbolic(app_dir(), converted["netlist"], output_dir(), cancel_event=native.cancel_event)
+        result = run_symbolic(installation, converted["netlist"], output_dir(), cancel_event=native.cancel_event)
+        # If the optional worker disappears after the preflight, retain its
+        # real failure in the already-created export job instead of failing
+        # publication with an unrelated missing-working-directory error.
+        if not result.get("cwd"):
+            result["working_dir"] = exported["working_dir"]
         result["native_netlist_export"] = exported
         result["conversion"] = {k: v for k, v in converted.items() if k != "netlist"}
         parameter = converted.get("input_parameter")

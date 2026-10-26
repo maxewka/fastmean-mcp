@@ -498,7 +498,9 @@ def cirsym_from_fastmean_netlist(
             if name in ports and ports[name] != number:
                 raise ValueError(f"native port {name!r} maps to inconsistent nodes")
             ports[name] = number
-            node_numbers.add(number)
+            # A label alone is not an electrical connection. Probes must refer
+            # to nodes actually used by supported components, never a dangling
+            # named port that would create a nonexistent CIRSYM output node.
             continue
         if len(fields) < 4:
             raise ValueError(f"unsupported native netlist row on line {line_number}: {stripped}")

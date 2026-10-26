@@ -558,6 +558,15 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(resource_bytes(await restarted.read_resource(png["uri"])), png_bytes)
                 self.assertEqual(filesystem_snapshot(output), before,
                                  "Retrieval must not republish or mutate persisted records after restart")
+                # The inline image must enforce the same digest as the resource.
+                # Editing one byte preserves size, so a size-only check misses it.
+                png_path = Path(preview["png_path"])
+                png_path.write_bytes(png_bytes[:-1] + bytes([png_bytes[-1] ^ 1]))
+                rejected = await restarted.call_tool("fastmean_get_result", {"run_id": run_id})
+                self.assertTrue(rejected.is_error)
+                self.assertIn("changed after publication", str(payload(rejected)))
+                self.assertFalse(any(item.type == "image" for item in rejected.content))
+                self.assertTrue((await self.call_success(restarted, "fastmean_status"))["ok"])
 
     @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
         "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")

@@ -8,6 +8,13 @@ This creates another persistent run without starting FASTMEAN or requiring a
 separate plotting script. FASTMEAN supplies the numbers; Matplotlib in the MCP
 server renders the chart.
 
+Native runs verify the requested axis coverage before publication; AC also
+verifies the requested linear/logarithmic grid. Duplicate exported signal
+expressions are rejected to keep column selection unambiguous. Reopening an
+inline image verifies its registered artifact digest. Paged CSV reads verify
+the complete table's digest, including bytes outside the requested page, and
+return `csv_sha256`; large native CSVs retain streaming verification.
+
 ## Five signals from a native transient
 
 Run `fastmean_transient` with the path to the amplifier SCM. Replace the path

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import csv
+import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -38,6 +40,52 @@ class ArtifactTests(unittest.TestCase):
         self.assertFalse(self.root.exists())
         self.assertEqual(self.store.list_runs()["count"], 0)
         self.assertFalse(self.root.exists())
+
+    def test_corrupt_catalog_entries_fail_as_domain_errors_before_discovery_or_read(self):
+        job = self.job()
+        self.table(job)
+        record = self.store.publish({"working_dir": str(job)})
+        path = job / "mcp-result.json"
+        changes = [None, [], "not-an-entry", {},
+            {"name": 7}, {"name": "../escape.csv"},
+            {"relative_path": "../data.csv"}, {"relative_path": "/data.csv"},
+            {"relative_path": "C:/data.csv"}, {"relative_path": "C:data.csv"},
+            {"relative_path": "folder\\data.csv"}, {"relative_path": "folder//data.csv"},
+            {"relative_path": "./data.csv"}, {"relative_path": ""}, {"relative_path": []},
+            {"relative_path": "bad\x00data.csv"},
+            {"uri": "file:///private.csv"}, {"uri": "fastmean://artifacts/other/data.csv"},
+            {"size": True}, {"size": -1}, {"size": 2 ** 63}, {"size": "20"},
+            {"sha256": None}, {"sha256": []}, {"sha256": "not-a-hash"}, {"sha256": "x" * 64},
+            {"mime_type": []}, {"mime_type": "text/html"}, {"relative_path": "data.exe"}]
+        index = next(i for i, entry in enumerate(record["artifacts"]) if entry["name"] == "data.csv")
+        for change in changes:
+            mutated = copy.deepcopy(record)
+            if isinstance(change, dict) and change:
+                mutated["artifacts"][index].update(change)
+            else:
+                mutated["artifacts"][index] = change
+            path.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.subTest(change=change):
+                with self.assertRaises(ArtifactError):
+                    self.store.get_run(record["run_id"])
+                with self.assertRaises(ArtifactError):
+                    self.store.read_data(record["run_id"])
+                self.assertEqual(self.store.list_runs()["count"], 0)
+        mutated = copy.deepcopy(record)
+        mutated["artifacts"].append(mutated["artifacts"][index])
+        path.write_text(json.dumps(mutated), encoding="utf-8")
+        with self.assertRaises(ArtifactError):
+            self.store.get_run(record["run_id"])
+
+    def test_uppercase_digest_is_valid_and_verified(self):
+        job = self.job()
+        source = self.table(job)
+        record = self.store.publish({"working_dir": str(job)})
+        entry = next(item for item in record["artifacts"] if item["name"] == "data.csv")
+        entry["sha256"] = entry["sha256"].upper()
+        (job / "mcp-result.json").write_text(json.dumps(record), encoding="utf-8")
+        self.assertEqual(self.store.read_artifact(record["run_id"], "data.csv"), source.read_bytes())
+        self.assertEqual(self.store.read_data(record["run_id"], limit=1)["csv_sha256"], entry["sha256"].lower())
 
     def test_publish_bounds_response_retains_raw_and_survives_restart(self):
         job = self.job()
@@ -179,10 +227,51 @@ class ArtifactTests(unittest.TestCase):
             with self.subTest(arguments=arguments), self.assertRaises(ArtifactError):
                 self.store.read_data("run-1", **arguments)
 
+    def test_paged_csv_rejects_same_size_changes_inside_and_after_the_page(self):
+        job = self.job()
+        path = self.table(job, count=10000)
+        original = path.read_bytes()
+        record = self.store.publish({"working_dir": str(job)})
+        expected = hashlib.sha256(original).hexdigest()
+        self.assertEqual(self.store.read_data(record["run_id"], limit=1)["csv_sha256"], expected)
+        for before, after in ((b"0,0.0", b"0,9.0"), (b"9999,4999.5", b"9999,4999.6")):
+            with self.subTest(changed=before):
+                changed = original.replace(before, after)
+                self.assertNotEqual(changed, original)
+                self.assertEqual(len(changed), len(original))
+                path.write_bytes(changed)
+                with self.assertRaisesRegex(ArtifactError, "SHA256"):
+                    self.store.read_data(record["run_id"], limit=1)
+
+    def test_large_csv_is_hashed_and_read_by_page_without_resource_size_expansion(self):
+        job = self.job()
+        path = job / "data.csv"
+        # Large numeric fields exercise streaming, not a huge result allocation.
+        row = "0." + "0" * 40000 + "1"
+        with path.open("w", encoding="utf-8") as stream:
+            stream.write("t,y\n")
+            for index in range(256):
+                stream.write(f"{index},{row}\n")
+        record = self.store.publish({"working_dir": str(job)})
+        entry = next(item for item in record["artifacts"] if item["name"] == "data.csv")
+        self.assertGreater(entry["size"], MAX_READ_BYTES)
+        self.assertEqual(len(entry["sha256"]), 64)
+        with self.assertRaisesRegex(ArtifactError, "8 MiB"):
+            self.store.read_artifact(record["run_id"], "data.csv")
+        page = self.store.read_data(record["run_id"], limit=1)
+        self.assertEqual(page["rows"], [[0., 0.]])
+        self.assertEqual(page["csv_sha256"], entry["sha256"])
+        self.assertEqual(page["next_offset"], 1)
+        with path.open("r+b") as stream:
+            stream.seek(-2, 2)
+            stream.write(b"2")
+        with self.assertRaisesRegex(ArtifactError, "SHA256"):
+            self.store.read_data(record["run_id"], limit=1)
+
     def test_nonfinite_or_ragged_csv_is_rejected(self):
         job = self.job()
         path = job / "data.csv"
-        for contents in ("t,y\n0,nan\n", "t,y\n0,1,2\n", "t,y\n0,no\n"):
+        for contents in ("t,y\n0,nan\n", "t,y\n0,1,2\n", "t,y\n0,no\n", "t,y,y\n0,1,2\n"):
             path.write_text(contents, encoding="utf-8")
             self.store.publish({"working_dir": str(job)})
             with self.subTest(contents=contents), self.assertRaises(ArtifactError):

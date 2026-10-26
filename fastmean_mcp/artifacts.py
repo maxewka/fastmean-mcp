@@ -10,12 +10,13 @@ import io
 import json
 import math
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import tempfile
 from typing import Any
 
 MAX_READ_BYTES = 8 * 1024 * 1024
+MAX_CSV_BYTES = 256 * 1024 * 1024
 MAX_RESPONSE_BYTES = 128 * 1024
 _FORMAT = "fastmean-mcp-artifacts-v1"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -34,6 +35,26 @@ _PRIORITY = frozenset({"ok", "error", "status", "code", "run_id", "resource_uri"
 
 class ArtifactError(ValueError):
     """Invalid run, unpublished artifact or unsupported artifact operation."""
+
+
+class _DigestReader(io.RawIOBase):
+    """Hash the bytes actually consumed, with a fixed streaming size limit."""
+
+    def __init__(self, raw, maximum_bytes=MAX_CSV_BYTES):
+        self.raw, self.digest, self.count = raw, hashlib.sha256(), 0
+        self.maximum_bytes = maximum_bytes
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        count = self.raw.readinto(buffer)
+        if count:
+            self.count += count
+            if self.count > self.maximum_bytes:
+                raise ArtifactError("CSV exceeds the 256 MiB limit.")
+            self.digest.update(memoryview(buffer)[:count])
+        return count
 
 
 def _name(value: Any, label: str) -> str:
@@ -245,6 +266,15 @@ class ArtifactStore:
                     "relative_path": path.relative_to(job).as_posix()}
             if size <= MAX_READ_BYTES:
                 item["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+            elif path.suffix.lower() == ".csv" and size <= MAX_CSV_BYTES:
+                # Paged data must retain the same integrity guarantee as small
+                # resource reads, without loading a whole large table in RAM.
+                with path.open("rb") as raw, io.BufferedReader(_DigestReader(raw)) as stream:
+                    while stream.read(1024 * 1024):
+                        pass
+                    item["sha256"] = stream.raw.digest.hexdigest()
+                    if stream.raw.count != size:
+                        raise ArtifactError("CSV changed during publication.")
             catalog.append(item)
             if len(catalog) >= 100: break
         return catalog
@@ -282,6 +312,25 @@ class ArtifactStore:
             raise ArtifactError("Run result record is unreadable.") from error
         if not isinstance(record, dict) or record.get("record_format") != _FORMAT or record.get("run_id") != run_id or record.get("resource_uri") != f"fastmean://runs/{run_id}" or not isinstance(record.get("artifacts"), list) or len(record["artifacts"]) > 100:
             raise ArtifactError("Run has no recognized result record.")
+        names = set()
+        for entry in record["artifacts"]:
+            if not isinstance(entry, dict):
+                raise ArtifactError("Run has an invalid artifact catalog entry.")
+            name = _name(entry.get("name"), "artifact name")
+            relative, size, digest = entry.get("relative_path"), entry.get("size"), entry.get("sha256")
+            if (name in names or entry.get("uri") != f"fastmean://artifacts/{run_id}/{name}"
+                    or not isinstance(relative, str) or not relative or len(relative) > 256
+                    or "\\" in relative or "\x00" in relative or PureWindowsPath(relative).drive
+                    or any(part in {"", ".", ".."} for part in relative.split("/"))
+                    or isinstance(size, bool) or not isinstance(size, int) or not 0 <= size < 2 ** 63
+                    or ("sha256" in entry and (not isinstance(digest, str)
+                        or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)))):
+                raise ArtifactError("Run has an invalid artifact catalog entry.")
+            suffix, basename = Path(relative).suffix.lower(), Path(relative).name
+            if ((suffix not in _MIMES and basename not in {"out", "cir", "human.sym"})
+                    or entry.get("mime_type") != _MIMES.get(suffix, "text/plain")):
+                raise ArtifactError("Run has an invalid artifact catalog MIME type or file format.")
+            names.add(name)
         return record
 
     def list_runs(self, limit: int = 20) -> dict:
@@ -329,7 +378,7 @@ class ArtifactStore:
             raise ArtifactError("Artifact exceeds 8 MiB; use paged CSV data or its local file.")
         data = path.read_bytes()
         if len(data) > MAX_READ_BYTES: raise ArtifactError("Artifact exceeds 8 MiB.")
-        if entry.get("sha256") and hashlib.sha256(data).hexdigest() != entry["sha256"]:
+        if entry.get("sha256") and hashlib.sha256(data).hexdigest() != entry["sha256"].lower():
             raise ArtifactError("Artifact changed after publication.")
         return data
 
@@ -342,12 +391,29 @@ class ArtifactStore:
         choices = sorted((item for item in record["artifacts"] if isinstance(item, dict) and str(item.get("name", "")).lower().endswith(".csv")), key=lambda item: (item["name"] != "data.csv", item["name"]))
         if not choices: raise ArtifactError("Run has no published CSV data.")
         path, entry, _ = self._artifact(run_id, choices[0]["name"])
+        if entry["size"] > MAX_CSV_BYTES:
+            raise ArtifactError("CSV exceeds the 256 MiB limit.")
+        expected_hash = entry.get("sha256")
+        if expected_hash is None and entry["name"] == "data.csv":
+            # Older releases omitted catalog hashes above 8 MiB, but the
+            # authenticated native manifest still carries the original digest.
+            try:
+                manifest = json.loads(self.read_artifact(run_id, "manifest.json").decode("utf-8"))
+                if isinstance(manifest, dict):
+                    expected_hash = manifest.get("csv_sha256")
+            except (ArtifactError, OSError, UnicodeError, json.JSONDecodeError) as error:
+                raise ArtifactError("CSV has no readable publication SHA256 provenance.") from error
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash):
+            raise ArtifactError("CSV has no recognized publication SHA256 provenance.")
         rows, more, byte_count = [], False, 0
         try:
-            with path.open("r", encoding="utf-8-sig", newline="") as stream:
+            with path.open("rb") as raw, io.TextIOWrapper(io.BufferedReader(_DigestReader(raw)),
+                    encoding="utf-8-sig", newline="") as stream:
+                if os.fstat(raw.fileno()).st_size != entry["size"]:
+                    raise ArtifactError("Artifact changed after publication.")
                 reader = csv.reader(stream)
                 header = next(reader, None)
-                if not header or len(header) > 64 or any(not item for item in header) or sum(len(item.encode("utf-8")) for item in header) > 8192:
+                if not header or len(header) > 64 or len(set(header)) != len(header) or any(not item for item in header) or sum(len(item.encode("utf-8")) for item in header) > 8192:
                     raise ArtifactError("CSV has an invalid or oversized column header.")
                 for index, raw in enumerate(reader):
                     if len(raw) != len(header): raise ArtifactError(f"CSV row {index + 1} has the wrong column count.")
@@ -359,12 +425,21 @@ class ArtifactStore:
                     if len(rows) >= limit or byte_count + row_bytes > 96 * 1024:
                         more = True; break
                     rows.append(row); byte_count += row_bytes
+                # TextIOWrapper may have decoded bytes ahead of the requested
+                # page; those are already hashed. Drain the remaining binary
+                # stream without parsing or retaining unrequested rows.
+                while stream.buffer.read(1024 * 1024):
+                    pass
+                hashed = stream.buffer.raw
+                digest, bytes_read = hashed.digest.hexdigest(), hashed.count
+                if bytes_read != entry["size"] or digest != expected_hash.lower():
+                    raise ArtifactError("CSV SHA256 changed after publication.")
         except (OSError, UnicodeError, csv.Error) as error:
             raise ArtifactError(f"Could not read numeric CSV data: {error}") from error
         return {"run_id": run_id, "columns": header, "rows": rows, "offset": offset,
                 "limit": limit, "returned_count": len(rows), "has_more": more,
                 "next_offset": offset + len(rows) if more else None,
-                "csv_artifact": entry["name"], "resource_uri": entry["uri"]}
+                "csv_artifact": entry["name"], "resource_uri": entry["uri"], "csv_sha256": digest}
 
     def load_native_data(self, run_id: str) -> dict:
         """Read a verified registered native table for internal post-processing.
@@ -390,31 +465,15 @@ class ArtifactStore:
                for value in (expected_hash, native_hash)):
             raise ArtifactError("Native manifest has no recognized CSV/native-data SHA256 provenance.")
         path, entry, _ = self._artifact(run_id, "data.csv")
-        maximum_bytes, maximum_rows = 256 * 1024 * 1024, 10000 if analysis == "ac" else 1000001
+        maximum_bytes, maximum_rows = MAX_CSV_BYTES, 10000 if analysis == "ac" else 1000001
         if path.stat().st_size > maximum_bytes:
             raise ArtifactError("Native CSV exceeds the 256 MiB limit.")
-
-        class DigestReader(io.RawIOBase):
-            def __init__(self, raw):
-                self.raw, self.digest, self.count = raw, hashlib.sha256(), 0
-
-            def readable(self):
-                return True
-
-            def readinto(self, buffer):
-                count = self.raw.readinto(buffer)
-                if count:
-                    self.count += count
-                    if self.count > maximum_bytes:
-                        raise ArtifactError("Native CSV exceeds the 256 MiB limit.")
-                    self.digest.update(memoryview(buffer)[:count])
-                return count
 
         try:
             with path.open("rb") as raw:
                 if os.fstat(raw.fileno()).st_size != entry["size"]:
                     raise ArtifactError("Artifact changed after publication.")
-                hashed = DigestReader(raw)
+                hashed = _DigestReader(raw)
                 with io.TextIOWrapper(io.BufferedReader(hashed), encoding="utf-8-sig", newline="") as stream:
                     reader = csv.reader(stream)
                     header = next(reader, None)
@@ -442,7 +501,7 @@ class ArtifactStore:
                         for column, number in zip(values, numbers):
                             column.append(number)
                     digest, bytes_read = hashed.digest.hexdigest(), hashed.count
-            if digest != expected_hash.lower() or (entry.get("sha256") and digest != entry["sha256"]):
+            if digest != expected_hash.lower() or (entry.get("sha256") and digest != entry["sha256"].lower()):
                 raise ArtifactError("Native CSV SHA256 changed after publication.")
             if bytes_read != entry["size"] or count != manifest.get("row_count") or count < 2:
                 raise ArtifactError("Native CSV size or row count disagrees with its manifest.")
