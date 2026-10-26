@@ -1,5 +1,100 @@
 # Validation history
 
+## 1.1.0: native projects, annotations, bend cleanup and client profiles
+
+Local Windows / FASTMEAN 6.1 on 2026-10-26: **159 passed, 4 skipped,
+158 subtests**, 51.24 seconds, with both native flags enabled. Skips concern
+existing symlink privileges and PowerShell policy; no Windows settings changed.
+No hosted CI or third-party model account test is claimed for this version.
+
+The same checkout was also checked with FASTMEAN intentionally unavailable,
+matching the CI configuration: **143 passed, 20 skipped, 158 subtests**,
+26.70 seconds. All five generated client profiles independently initialized
+the installed 1.1.0 server, discovered 20 tools and called status successfully.
+Installed Python module bytes match the reviewed source; installer doctor passed.
+
+- 20 tools initialize through the actual pinned MCP SDK stdio protocol.
+- Native asymmetric three-pin and repeated two-level model tests verify pin
+  mapping, independent internal nodes, half-voltage gain and source preservation.
+  AC test fixtures use sine excitation (a DC-only source does not excite AC).
+- Annotation creates portable model copies, root .parameter bindings, integer
+  TEXT positions and saved graph expressions. Empty expression lists clear
+  the requested section; omitted lists preserve it. Preview scales note text
+  with geometry, preventing overlap on large annotated sheets.
+- Endpoint-derived L and midpoint bends were checked against the native routing
+  routine in 563 supported coordinate/direction cases with no mismatches.
+  Native four-unit rounding is included; unsupported detours remain explicit.
+  Degree-two CON removal requires an identical geometric path. Branches remain,
+  and preview displays every retained CON rather than hiding routing waypoints.
+- A private four-BJT amplifier project lost **85 redundant CON objects** across
+  its main sheet and four equivalent-model sheets. Independent flattening of
+  the logical JSON and the native netlist agreed on **60 leaf components,
+  136 terminals, 43 nodes**, with no split or merged nodes.
+- The same amplifier's native transient, measured over 0.29–0.30 s, produced
+  **25.002515 V RMS, 20.002012 A RMS and 500.100725 W** into 1.25 ohm.
+  Root parameter annotation and bend cleanup preserved the original numerical
+  result. Input was 0.999983 V RMS / 66.8034 mA RMS / 94.4609 mA peak.
+  These are nominal PWL equivalent-model results, not manufacturer SPICE, SOA,
+  thermal, bandwidth or hardware validation. Ordinary FD was not valid for that
+  nonlinear example; its saved FD traces were cleared instead of misreported.
+- Export profiles cover Claude Code/Desktop, Kimi CLI and DeepSeek via Cline.
+  They keep argv boundaries and local paths, contain no provider credentials,
+  grant no automatic approvals and never replace an existing client config.
+
+Private native files, manuals, transistor worksheets and application code are
+not included in the distributed adapter.
+
+## Subcircuit development checks
+
+On 2026-10-26, **68 selected offline checks passed**, including genuine stdio
+initialization/discovery of 20 tools, existing circuit creation and schema-error
+recovery. These checks started no FASTMEAN process and used no desktop control.
+
+Coverage includes complete pin maps, dynamic three-pin Type-7100 inspection,
+fixed primitive parameter validation, cycle detection including aliases,
+atomic project publication without replacement, original JSON/hash retention,
+nested artifact retrieval, and public normalized-spec round trips. Genuine MCP
+calls created a nested project, retrieved its original JSON through a resource,
+changed a model's value and rebuilt a new project while preserving the first.
+MCP preview returned PNG and SVG using native pin geometry. Literal numeric
+parameter identifiers display without evaluation; unsupported expressions,
+flips and custom Type-7100 scale/font contexts are rejected. Explicit
+open preparation was tested with a mocked process launcher: recursive private
+models and their source/copy hashes were verified without opening a GUI.
+
+Genuine stdio calls also added numeric R0/C0 root parameters, bound R/C values,
+explanatory native TEXT and prepared TD/FD expressions, then inspected and
+previewed the result. Nested projects retained their short relative model
+captions through annotation, and every original model stayed unchanged.
+
+A separate native batch export checked an asymmetric three-pin passive model
+with B on the left, E on top and C below. With child PORT orientation and
+coordinates matching these sides, native output mapped B to IN, C to OUT and
+E to ground, including the intended RBC and RCE connections. This guards a
+silent terminal swap: FASTMEAN rebuilds its external interface from child PORT
+geometry rather than relying on cached parent labels. No GUI was used.
+
+These are intermediate adapter checks, not native validation of transistor
+models or amplifier performance. Native numerical hierarchy/amplifier checks
+are tracked separately.
+
+## 1.0.2: compact automatic spacing
+
+Local Windows checks on 2026-10-26, using Python's UTF-8 mode:
+
+- Portable suite with FASTMEAN deliberately unavailable: **95 passed,
+  17 skipped**, 91 subtests. No native calculations were started.
+- Compact RC, RLC and divider drawings retain the same electrical terminal
+  partitions, parameters, ports and analysis settings. Their drawing bounds
+  occupy at least 15% less area than the standard preset.
+- Installed stdio MCP 1.0.2 initialized and returned all 17 tools. Creation
+  defaults to compact; both relayout density values work, preserve the input,
+  and appear in the actual MCP input schema. Unrelated configuration bytes
+  were preserved. The installer doctor passed.
+- Preview of the compact RLC drawing was visually inspected. Native symbol
+  geometry and the 20-unit grid remain unchanged. Long labels still require
+  visual review. These checks do not validate new transistor models.
+
 ## 1.0.1: Windows path aliases
 
 The first hosted Ubuntu test run passed. The Windows run exposed DOS 8.3

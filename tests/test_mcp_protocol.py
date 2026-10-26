@@ -36,7 +36,7 @@ from mcp.client.stdio import stdio_client
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 SERVER_PATH = Path(os.environ.get("FASTMEAN_MCP_TEST_SERVER", PACKAGE_DIR / "server.py")).resolve()
 REQUIRED_TOOLS = {
-    "fastmean_status", "fastmean_example", "fastmean_create_circuit", "fastmean_edit_values",
+    "fastmean_status", "fastmean_example", "fastmean_create_circuit", "fastmean_create_project", "fastmean_annotate_circuit", "fastmean_export_netlist", "fastmean_edit_values",
     "fastmean_ac", "fastmean_transient", "fastmean_symbolic", "fastmean_inspect",
     "fastmean_list_examples", "fastmean_open", "fastmean_search_manual",
     "fastmean_relayout", "fastmean_preview", "fastmean_list_runs",
@@ -314,7 +314,7 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
             async with self.session(output_dir) as client:
                 listed = await client.list_tools()
                 names = {tool.name for tool in listed.tools}
-                self.assertEqual(len(REQUIRED_TOOLS), 17)
+                self.assertEqual(len(REQUIRED_TOOLS), 20)
                 self.assertFalse(REQUIRED_TOOLS - names,
                                  f"Missing tools: {sorted(REQUIRED_TOOLS - names)}")
                 for tool in listed.tools:
@@ -376,7 +376,95 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                         self.assertIn("point" if "points" in values else "signal", str(payload(rejected)).lower())
                         self.assertEqual(filesystem_snapshot(output), before,
                                          "Schema rejection must happen before creating job files/directories")
+                for timeout in (0, 60.1, "invalid"):
+                    rejected = await client.call_tool("fastmean_export_netlist", {"path": str(source), "timeout": timeout})
+                    self.assertTrue(rejected.is_error)
+                    self.assertEqual(filesystem_snapshot(output), before)
                 await self.call_success(client, "fastmean_status")
+
+    async def test_project_creation_resource_edit_and_regeneration_through_stdio(self):
+        from tests.test_hierarchy import project_spec
+        with tempfile.TemporaryDirectory(prefix="fastmean-mcp-hierarchy-") as temporary:
+            root = Path(temporary).resolve()
+            output = root / "runs"
+            spec = project_spec()
+            async with self.session(output, app_dir=root / "not-installed") as client:
+                created = await self.call_success(client, "fastmean_create_project", {"spec": spec, "name": "portable"})
+                self.assertEqual(Path(created["working_dir"]).parent, output)
+                self.assertEqual(Path(created["project_dir"]).parent, Path(created["working_dir"]))
+                model = next(item for item in created["models"] if item["name"] == "RES")
+                original_model = Path(model["path"]).read_bytes()
+                inspected = await self.call_success(client, "fastmean_inspect", {"path": created["path"]})
+                instances = [item for item in inspected["components"] if item["native_type"] == 7100]
+                self.assertEqual(len(instances), 2)
+                self.assertTrue(all(len(item["native_pin_nodes"]) == 2 for item in instances))
+                preview = await client.call_tool("fastmean_preview", {"path": created["path"]})
+                self.assertFalse(preview.is_error, repr(payload(preview)))
+                self.assertTrue(any(getattr(item, "type", None) == "image" for item in preview.content))
+                rendered = payload(preview)
+                self.assertFalse(rendered["approximate_wire_routes"])
+                svg = next(item for item in rendered["artifacts"] if item["mime_type"] == "image/svg+xml")
+                drawing = resource_bytes(await client.read_resource(svg["uri"])).decode("utf-8")
+                for label in ("FIRST", "SECOND", "PAIR"):
+                    self.assertIn(label, drawing)
+                annotated = await self.call_success(client, "fastmean_annotate_circuit", {
+                    "path": created["path"], "parameters": {"VIN": 1}, "bindings": {"U1": "VIN"},
+                    "descriptions": ["Two nested passive stages"], "td_signals": ["U(OUT)"],
+                    "fd_signals": ["mag(U(OUT)/U(IN))"]})
+                self.assertEqual(annotated["dependency_layout"], "original_relative_tree")
+                self.assertFalse(annotated["preview_unsupported"])
+                self.assertEqual(len(annotated["dependency_artifacts"]), 2)
+                annotated_preview = await client.call_tool("fastmean_preview", {"path": annotated["path"]})
+                self.assertFalse(annotated_preview.is_error, repr(payload(annotated_preview)))
+                self.assertTrue(any(getattr(item, "type", None) == "image" for item in annotated_preview.content))
+                self.assertEqual(Path(model["path"]).read_bytes(), original_model)
+                saved_spec = next(item for item in created["artifacts"] if item["relative_path"] == "portable/project.spec.json")
+                editable = json.loads(resource_bytes(await client.read_resource(saved_spec["uri"])))
+                self.assertEqual(editable, spec)
+                editable["models"]["RES"]["circuit"]["components"][0]["value"] = "2k"
+                rebuilt = await self.call_success(client, "fastmean_create_project", {"spec": editable, "name": "portable"})
+                self.assertNotEqual(created["run_id"], rebuilt["run_id"])
+                new_model = next(item for item in rebuilt["models"] if item["name"] == "RES")
+                updated = await self.call_success(client, "fastmean_inspect", {"path": new_model["path"]})
+                self.assertEqual(updated["components"][0]["value"], 2000)
+                self.assertNotEqual(model["sha256"], new_model["sha256"])
+                self.assertEqual(Path(model["path"]).read_bytes(), original_model)
+                status = await self.call_success(client, "fastmean_status")
+                self.assertFalse(status["installed"])
+                self.assertEqual(status["active_operations"], [])
+
+    async def test_parameters_explanations_and_preloaded_formulas_through_stdio(self):
+        with tempfile.TemporaryDirectory(prefix="fastmean-mcp-annotations-") as temporary:
+            root = Path(temporary).resolve()
+            output = root / "runs"
+            async with self.session(output, app_dir=root / "not-installed") as client:
+                _, source = await self.create_rc(client, output)
+                original = source.read_bytes()
+                td = ["U(out)", "I(R1)"]
+                fd = ["db(U(out)/U(in))", "phs(U(out)/U(in))"]
+                annotated = await self.call_success(client, "fastmean_annotate_circuit", {
+                    "path": str(source), "parameters": {"R0": "1k", "C0": "1u"},
+                    "bindings": {"R1": "R0", "C1": "C0"},
+                    "descriptions": ["Time constant tau = R0*C0", "Cutoff fc = 1/(2*pi*R0*C0)"],
+                    "td_signals": td, "fd_signals": fd})
+                self.assertEqual(Path(annotated["working_dir"]).parent, output)
+                inspected = await self.call_success(client, "fastmean_inspect", {"path": annotated["path"], "include_objects": True})
+                components = {item["name"]: item for item in inspected["components"]}
+                self.assertEqual(components["R1"]["value"], "R0")
+                self.assertEqual(components["C1"]["value"], "C0")
+                self.assertEqual([item["y"] for item in inspected["analysis"]["TD"]["Expressions"]], td)
+                self.assertEqual([item["y"] for item in inspected["analysis"]["FD"]["Expressions"]], fd)
+                texts = [item.get("Params", {}).get("Text", "") for item in inspected["objects"] if item["Type"] == 900]
+                self.assertTrue(any(".parameter" in text and "R0" in text for text in texts))
+                self.assertTrue(any("Time constant" in text for text in texts))
+                preview = await client.call_tool("fastmean_preview", {"path": annotated["path"]})
+                self.assertFalse(preview.is_error, repr(payload(preview)))
+                self.assertTrue(any(getattr(item, "type", None) == "image" for item in preview.content))
+                self.assertEqual(source.read_bytes(), original)
+                rejected = await client.call_tool("fastmean_annotate_circuit", {"path": str(source), "parameters": {"bad;exit": 1}})
+                self.assertTrue(rejected.is_error)
+                self.assertEqual(source.read_bytes(), original)
+                self.assertFalse((await self.call_success(client, "fastmean_status"))["installed"])
 
     async def test_preview_resources_and_persisted_results_survive_server_restart(self):
         with tempfile.TemporaryDirectory(prefix="fastmean-mcp-preview-") as temporary:
@@ -414,6 +502,26 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(resource_bytes(await restarted.read_resource(png["uri"])), png_bytes)
                 self.assertEqual(filesystem_snapshot(output), before,
                                  "Retrieval must not republish or mutate persisted records after restart")
+
+    @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
+        "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")
+    async def test_native_expanded_netlist_through_stdio_has_full_artifact(self):
+        with tempfile.TemporaryDirectory(prefix="fastmean-mcp-netlist-") as temporary:
+            output = Path(temporary).resolve()
+            async with self.session(output) as client:
+                _, source = await self.create_rc(client, output)
+                original = source.read_bytes()
+                raw = await client.call_tool("fastmean_export_netlist", {"path": str(source), "timeout": 15})
+                self.assertFalse(raw.is_error, repr(payload(raw)))
+                exported = payload(raw)
+                for name in ("R1", "C1", "U1"):
+                    self.assertIn(name, exported["text"])
+                artifact = next(item for item in exported["artifacts"] if item["name"] == "netlist.txt")
+                native = resource_bytes(await client.read_resource(artifact["uri"]))
+                self.assertEqual(native, Path(exported["path"]).read_bytes())
+                self.assertEqual(source.read_bytes(), original)
+                self.assertFalse(any(getattr(item, "type", None) == "image" for item in raw.content))
+                self.assertEqual((await self.call_success(client, "fastmean_status"))["active_operations"], [])
 
     @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
         "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")

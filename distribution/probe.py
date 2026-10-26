@@ -14,6 +14,9 @@ import tomllib
 
 
 REQUIRED_TOOLS = {"fastmean_status", "fastmean_example", "fastmean_create_circuit",
+                  "fastmean_create_project",
+                  "fastmean_annotate_circuit",
+                  "fastmean_export_netlist",
                   "fastmean_ac", "fastmean_transient", "fastmean_symbolic", "fastmean_inspect"}
 
 

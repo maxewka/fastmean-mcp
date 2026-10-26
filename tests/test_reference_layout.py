@@ -57,8 +57,12 @@ class ReferenceLayoutTests(unittest.TestCase):
                 pin = (endpoint["ID"], endpoint["pin"])
                 self.assertNotIn(pin, pins, "Two wires must meet at a CON, not share a terminal")
                 pins.add(pin)
-            a, b = anchor(wire["obj1"]), anchor(wire["obj2"])
-            self.assertTrue(a[0] == b[0] or a[1] == b[1], "Native wire must be orthogonal")
+            from fastmean_mcp.wires import wire_path
+            points = wire_path(wire, objects)
+            self.assertEqual(points[0], anchor(wire['obj1']))
+            self.assertEqual(points[-1], anchor(wire['obj2']))
+            for a, b in zip(points, points[1:]):
+                self.assertTrue(a[0] == b[0] or a[1] == b[1], "Each native wire leg must be orthogonal")
 
     @unittest.skipUnless(NATIVE, "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows")
     def test_native_three_band_response_matches_independent_complex_kcl(self):

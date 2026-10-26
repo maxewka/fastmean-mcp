@@ -1,8 +1,9 @@
 """Read and author FASTMEAN 5.x text SCM files without starting FASTMEAN.
 
-Creation supports linear R/C/L networks and independent voltage sources. Names
-used by the native analysis engine are ASCII identifiers. Existing UTF-8 and
-Windows-1251 diagrams, including Russian labels, can be read without rewriting.
+Creation supports R/C/L/U, fixed native diode and controlled-source primitives,
+and named native subcircuit instances. Names used by the native analysis engine
+are ASCII identifiers. Existing UTF-8 and Windows-1251 diagrams, including
+Russian labels, can be read without rewriting.
 
 Native templates were checked against FASTMEAN 6.1 bundled examples and the
 successfully opened RC_formula_test.scm. A wire stores object ID and terminal
@@ -25,11 +26,16 @@ import yaml
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_COMPONENTS = 200
 TYPE_IDS = {"R": 1000, "C": 1001, "L": 1002, "U": 2010,
+            "D": 1101, "G": 6000, "E": 6001, "F": 6002, "X": 7100,
             "I": 3010, "GND": 200, "CON": 300, "PORT": 400, "TEXT": 900}
 KINDS = {value: key for key, value in TYPE_IDS.items()}
 PIN_COUNTS = {1000: 2, 1001: 2, 1002: 2, 2010: 2, 3010: 2,
+              1101: 2, 6000: 4, 6001: 4, 6002: 4,
               200: 1, 300: 4, 400: 1, 900: 0}
-CREATE_KINDS = frozenset({"R", "C", "L", "U"})
+CREATE_KINDS = frozenset({"R", "C", "L", "U", "D", "G", "E", "F", "X"})
+EDIT_KINDS = frozenset({"R", "C", "L", "U"})
+_SIDES = ("Left", "Top", "Right", "Bottom")
+_KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X"}
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _NUMBER = re.compile(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([A-Za-zµμА-Яа-я]*)$")
 _MULTIPLIERS = {"": 1., "k": 1e3, "K": 1e3, "M": 1e6, "meg": 1e6,
@@ -188,6 +194,31 @@ class _Union:
         self.parent[self.find(a)] = self.find(b)
 
 
+def _subcircuit_pin_names(obj: dict) -> list[str]:
+    """Native numbering follows Left, Top, Right, Bottom, in list order."""
+    params = obj.get("Params") or {}
+    pins = params.get("Pins") if isinstance(params, dict) else None
+    if pins is None:
+        return []  # Preserve inspection of legacy/partially specified objects.
+    if not isinstance(pins, dict) or set(pins) - set(_SIDES):
+        raise SchemeError("A native subcircuit Pins field must contain side lists.")
+    result = []
+    for side in _SIDES:
+        names = pins.get(side)
+        if names is None:  # Native saved files use null for empty sides.
+            names = []
+        if not isinstance(names, list) or any(not isinstance(name, str) or not name for name in names):
+            raise SchemeError("A native subcircuit pin must have a nonempty name.")
+        result.extend(names)
+    if len(result) > 64:
+        raise SchemeError("A native subcircuit exceeds 64 inspected pins.")
+    return result
+
+
+def _pin_count(obj: dict) -> int:
+    return len(_subcircuit_pin_names(obj)) if obj.get("Type") == 7100 else PIN_COUNTS.get(obj.get("Type"), 0)
+
+
 def _summarize(document: dict, path: Path, encoding: str) -> dict:
     body = document["scm"]
     scheme = body["Scheme"]
@@ -208,7 +239,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
             raise SchemeError(f"Duplicate object ID {oid}.")
         by_id[oid] = obj
         kind = obj.get("Type")
-        for pin in range(1, PIN_COUNTS.get(kind, 0) + 1):
+        for pin in range(1, _pin_count(obj) + 1):
             uf.find((oid, pin))
         if kind == 300:
             for pin in range(2, 5):
@@ -237,7 +268,12 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
             oid, pin = end.get("ID"), end.get("pin")
             if oid not in by_id or isinstance(oid, bool):
                 raise SchemeError(f"Wire refers to absent object {oid}.")
-            limit = PIN_COUNTS.get(by_id[oid].get("Type"), 64)
+            endpoint_object = by_id[oid]
+            if endpoint_object.get("Type") == 7100:
+                endpoint_params = endpoint_object.get("Params") or {}
+                limit = _pin_count(endpoint_object) if endpoint_params.get("Pins") is not None else 64
+            else:
+                limit = PIN_COUNTS.get(endpoint_object.get("Type"), 64)
             if not isinstance(pin, int) or isinstance(pin, bool) or not 1 <= pin <= limit:
                 raise SchemeError(f"Invalid terminal {oid}:{pin}.")
             ends.append((oid, pin))
@@ -275,7 +311,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
         if tid in {200, 300, 400, 900}:
             continue
         kind = KINDS.get(tid)
-        native_nodes = [names[uf.find((oid, pin))] for pin in range(1, PIN_COUNTS.get(tid, 0) + 1)]
+        native_nodes = [names[uf.find((oid, pin))] for pin in range(1, _pin_count(obj) + 1)]
         params = copy.deepcopy(obj.get("Params") or {})
         item = {"name": str(obj.get("Name", f"object_{oid}")), "type": kind or f"TYPE_{tid}",
                 "kind": kind or f"TYPE_{tid}", "native_id": oid, "native_type": tid,
@@ -298,6 +334,22 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
             item["polarity"] = "native_pin_order_unverified"
             warnings.append(f"{item['name']}: current-source direction is not validated; native_pin_nodes retain terminal order.")
             unsupported.add(tid)
+        elif kind in {"D", "G", "E", "F", "X"}:
+            item["nodes"] = native_nodes
+            # This compatibility field is also the R/C/L/U-only relayout guard.
+            # Native analysis supports these objects without flattening them in
+            # Python; symbolic/relayout support must be checked independently.
+            unsupported.add(tid)
+            if kind in {"G", "E", "F"}:
+                item["value"] = params.get({"G": "g", "E": "k", "F": "h"}[kind])
+                item["terminal_order"] = "native_pins_1_2_3_4"
+            elif kind == "D":
+                item["terminal_order"] = "native_pins_1_2"
+            else:
+                pin_names = _subcircuit_pin_names(obj)
+                item["pin_names"] = pin_names
+                item["connections"] = dict(zip(pin_names, native_nodes))
+                item["model_path"] = params.get("FileName")
         else:
             item["nodes"] = []
             unsupported.add(tid)
@@ -486,13 +538,177 @@ def _write_document(document: dict, destination: str | Path, overwrite: bool) ->
     return path.resolve()
 
 
-def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dict:
+def _model_context(value: Any) -> dict[str, dict]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise SchemeError("model_context must map model identifiers to pins and relative SCM paths.")
+    result, used = {}, set()
+    for name, definition in value.items():
+        name = _identifier(name, "Model name")
+        if name.casefold() in used:
+            raise SchemeError("Model names cannot differ only by case.")
+        used.add(name.casefold())
+        if not isinstance(definition, dict) or set(definition) != {"pins", "path"}:
+            raise SchemeError(f"{name}: model context requires exactly pins and path.")
+        pins = definition["pins"]
+        if not isinstance(pins, dict) or set(pins) - set(_SIDES):
+            raise SchemeError(f"{name}: model pins must map native side names to lists.")
+        canonical, labels = {}, set()
+        for side in _SIDES:
+            names = pins.get(side, [])
+            if not isinstance(names, list):
+                raise SchemeError(f"{name}: model pin sides must be lists, not null.")
+            canonical[side] = []
+            for label in names:
+                if not isinstance(label, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", label):
+                    raise SchemeError("Generated external pins must start with an ASCII letter.")
+                if label.casefold() in labels:
+                    raise SchemeError("Generated model pins must be unique, including case.")
+                labels.add(label.casefold())
+                canonical[side].append(label)
+        if not 1 <= len(labels) <= 32:
+            raise SchemeError("Generated models require 1 to 32 exposed pins.")
+        reference = definition["path"]
+        if not isinstance(reference, str) or not reference.isascii() or "\x00" in reference:
+            raise SchemeError("Generated model paths must be relative ASCII SCM paths.")
+        reference = reference.replace("\\", "/")
+        parts = reference.split("/")
+        if (reference.startswith("/") or ":" in reference or any(part in {"", ".", ".."} for part in parts)
+                or not reference.lower().endswith(".scm")
+                or not re.fullmatch(r"[A-Za-z0-9_./-]+", reference)):
+            raise SchemeError("Generated model paths must be portable relative SCM paths without traversal.")
+        result[name] = {"pins": canonical, "path": reference}
+    return result
+
+
+def _normalize_components(components: list, context: dict[str, dict]) -> tuple[list[dict], set[str], dict[str, str]]:
+    normalized, nodes, names, folded_nodes = [], set(), set(), {}
+    for raw in components:
+        if not isinstance(raw, dict):
+            raise SchemeError("Each component must be a mapping.")
+        alternatives = [_KIND_ALIASES.get(str(raw[key]).upper(), str(raw[key]).upper())
+                        for key in ("kind", "type") if key in raw]
+        if len(set(alternatives)) > 1:
+            raise SchemeError("Component kind and type disagree.")
+        kind = alternatives[0] if alternatives else ""
+        if kind not in CREATE_KINDS:
+            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, D, G/VCCS, E/VCVS, F/CCCS and X. Current-source polarity is not yet validated.")
+        name = _identifier(raw.get("name"), "Component name")
+        if name.casefold() in names:
+            raise SchemeError(f"Duplicate component name: {name}")
+        names.add(name.casefold())
+        allowed = {"kind", "type", "name", "nodes", "value", "waveform", "initial_condition"}
+        if kind == "X":
+            allowed = {"kind", "type", "name", "model", "connections"}
+        elif kind == "D":
+            allowed = {"kind", "type", "name", "nodes", "parameters"}
+        elif kind in {"G", "E", "F"}:
+            allowed = {"kind", "type", "name", "nodes", "value", "parameters"}
+        if set(raw) - allowed:
+            raise SchemeError(f"{name}: unsupported component properties; model parameter overrides are not generated.")
+        item = {"kind": kind, "type": kind, "name": name}
+        if kind == "X":
+            model = raw.get("model")
+            if not isinstance(model, str) or model not in context:
+                raise SchemeError(f"{name}: unknown subcircuit model {model!r}.")
+            definition = context[model]
+            pin_names = [pin for side in _SIDES for pin in definition["pins"][side]]
+            connections = raw.get("connections")
+            if not isinstance(connections, dict) or set(connections) != set(pin_names):
+                raise SchemeError(f"{name}: connections must map every model pin exactly.")
+            terminals = [normalize_node(connections[pin]) for pin in pin_names]
+            params = {"FileName": definition["path"], "Pins": copy.deepcopy(definition["pins"])}
+            item.update({"model": model, "connections": dict(zip(pin_names, terminals))})
+        else:
+            count = 4 if kind in {"G", "E", "F"} else 2
+            terminals = raw.get("nodes")
+            if not isinstance(terminals, list) or len(terminals) != count:
+                raise SchemeError(f"{name} must have exactly {count} node labels in native terminal order.")
+            terminals = [normalize_node(node) for node in terminals]
+            if count == 2 and terminals[0] == terminals[1]:
+                raise SchemeError(f"{name} has both terminals on the same node.")
+            if kind == "D":
+                raw_params = raw.get("parameters")
+                if not isinstance(raw_params, dict) or set(raw_params) != {"Ron", "Roff", "Uon"}:
+                    raise SchemeError(f"{name}: diode parameters must be exactly Ron, Roff and Uon.")
+                params = {key: parse_value(raw_params[key]) for key in ("Ron", "Roff", "Uon")}
+                if params["Ron"] <= 0 or params["Roff"] < params["Ron"] or params["Uon"] < 0:
+                    raise SchemeError(f"{name}: diode requires 0 < Ron <= Roff and Uon >= 0.")
+                item["parameters"] = copy.deepcopy(params)
+            elif kind in {"G", "E", "F"}:
+                key = {"G": "g", "E": "k", "F": "h"}[kind]
+                if "parameters" in raw:
+                    raw_params = raw["parameters"]
+                    if "value" in raw or not isinstance(raw_params, dict) or set(raw_params) != {key}:
+                        raise SchemeError(f"{name}: supply either value or the single numeric parameter {key}.")
+                    value = parse_value(raw_params[key])
+                else:
+                    value = parse_value(raw.get("value"))
+                item["value"], params = value, {key: value}
+            else:
+                value = parse_value(raw.get("value"))
+                if kind in {"R", "C", "L"} and value <= 0:
+                    raise SchemeError(f"{name}: passive values must be positive.")
+                item["value"] = value
+                params = {kind: value}
+                if kind == "U":
+                    item["waveform"] = copy.deepcopy(raw.get("waveform"))
+                    params = _source_params(value, item["waveform"])
+                elif "waveform" in raw:
+                    raise SchemeError(f"{name}: waveform is only valid for voltage sources.")
+                if kind in {"C", "L"}:
+                    item["initial_condition"] = parse_value(raw.get("initial_condition", 0))
+                    params["IC"] = item["initial_condition"]
+                elif "initial_condition" in raw:
+                    raise SchemeError("initial_condition is supported only for C and L.")
+        for node in terminals:
+            existing = folded_nodes.setdefault(node.casefold(), node)
+            if existing != node:
+                raise SchemeError(f"Ambiguous node casing: {existing} and {node}")
+        item.update({"nodes": terminals, "_native_type": TYPE_IDS[kind], "_native_params": params,
+                     "_native_nodes": list(reversed(terminals)) if kind == "U" else list(terminals)})
+        nodes.update(terminals)
+        normalized.append(item)
+    return normalized, nodes, folded_nodes
+
+
+def _validate_interface_ports(objects: list[dict], interface_pins: dict) -> list[str]:
+    """Native expansion rebuilds pin order from child PORT sides/coordinates."""
+    by_side = {side: [] for side in _SIDES}
+    side_for_rotation = {2: "Left", 3: "Top", 0: "Right", 1: "Bottom"}
+    for obj in objects:
+        if obj.get("Type") != 400 or str(obj.get("Name", "")).startswith("_"):
+            continue
+        if obj.get("FlipH", 0) or obj.get("FlipV", 0):
+            raise SchemeError("Generated subcircuit interface PORTs cannot be flipped.")
+        side = side_for_rotation.get(obj.get("Rot", 0))
+        if side is None:
+            raise SchemeError("Generated subcircuit interface PORT has an invalid rotation.")
+        axis = obj.get("Y" if side in {"Left", "Right"} else "X")
+        if isinstance(axis, bool) or not isinstance(axis, int):
+            raise SchemeError("Generated subcircuit PORT coordinates must be integers.")
+        by_side[side].append((axis, obj.get("Name")))
+    for side in _SIDES:
+        values = by_side[side]
+        if len({coordinate for coordinate, _ in values}) != len(values):
+            raise SchemeError(f"Subcircuit {side} PORTs need distinct native ordering coordinates.")
+        observed = [name for _, name in sorted(values)]
+        if observed != interface_pins[side]:
+            raise SchemeError(f"Native child PORT layout on {side} must match declared pins {interface_pins[side]}; got {observed}.")
+    return [name for side in _SIDES for _, name in sorted(by_side[side])]
+
+
+def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
+                   model_context: dict | None = None, subcircuit: bool = False,
+                   interface_pins: dict | None = None) -> dict:
     """Create an electrically connected native SCM from a node-based JSON spec.
 
-    Each component supplies kind/type, name, two nodes and value. Voltage-source
-    nodes are [positive, negative]; native pins are [negative, positive]. Ground
-    aliases are 0/gnd/ground. Arbitrary graph topology is supported for these
-    linear types within the orthogonal router's supported geometry.
+    R/C/L/U use two nodes and value. D uses fixed Ron/Roff/Uon parameters;
+    G/E/F use four native-ordered pins and a numeric gain. X instances map named
+    model pins through model_context. U nodes are [positive, negative], with
+    native pins reversed. Ground aliases are 0/gnd/ground. Floating subcircuit
+    definitions retain exactly their declared ports without adding test points.
     Components are physically connected with orthogonal native wires; ports
     represent only declared external interfaces and analysis inputs/outputs.
     The function validates references and floating graph islands, but does not
@@ -504,67 +720,36 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dic
         raise SchemeError("Unsupported circuit-spec fields; topology is expressed by component nodes.")
     if not 1 <= len(spec["components"]) <= MAX_COMPONENTS:
         raise SchemeError(f"Circuit must contain 1 to {MAX_COMPONENTS} components.")
-    normalized = []
-    nodes: set[str] = set()
-    names: set[str] = set()
-    folded_nodes: dict[str, str] = {}
-    for raw in spec["components"]:
-        if not isinstance(raw, dict):
-            raise SchemeError("Each component must be a mapping.")
-        if set(raw) - {"kind", "type", "name", "nodes", "value", "waveform", "initial_condition"}:
-            raise SchemeError("Unsupported component properties; nonlinear/custom models are not generated.")
-        if "kind" in raw and "type" in raw:
-            alternatives = {"U" if str(raw[key]).upper() == "V" else str(raw[key]).upper()
-                            for key in ("kind", "type")}
-            if len(alternatives) != 1:
-                raise SchemeError("Component kind and type disagree.")
-        kind = str(raw.get("kind", raw.get("type", ""))).upper()
-        if kind == "V":
-            kind = "U"
-        if kind not in CREATE_KINDS:
-            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V. Current-source polarity is not yet validated.")
-        name = _identifier(raw.get("name"), "Component name")
-        if name.casefold() in names:
-            raise SchemeError(f"Duplicate component name: {name}")
-        names.add(name.casefold())
-        terminals = raw.get("nodes")
-        if not isinstance(terminals, list) or len(terminals) != 2:
-            raise SchemeError(f"{name} must have exactly two node labels.")
-        terminals = [normalize_node(n) for n in terminals]
-        if terminals[0] == terminals[1]:
-            raise SchemeError(f"{name} has both terminals on the same node.")
-        for node in terminals:
-            existing = folded_nodes.setdefault(node.casefold(), node)
-            if existing != node:
-                raise SchemeError(f"Ambiguous node casing: {existing} and {node}")
-        value = parse_value(raw.get("value"))
-        if kind in {"R", "C", "L"} and value <= 0:
-            raise SchemeError(f"{name}: passive values must be positive.")
-        item = {"kind": kind, "type": kind, "name": name, "nodes": terminals, "value": value}
-        if kind == "U":
-            item["waveform"] = copy.deepcopy(raw.get("waveform"))
-        elif "waveform" in raw:
-            raise SchemeError(f"{name}: waveform is only valid for voltage sources.")
-        if kind in {"C", "L"}:
-            item["initial_condition"] = parse_value(raw.get("initial_condition", 0))
-        elif "initial_condition" in raw:
-            raise SchemeError("initial_condition is supported only for C and L.")
-        nodes.update(terminals)
-        normalized.append(item)
-    if "0" not in nodes:
-        raise SchemeError("Circuit must reference ground node 0.")
-    adjacency = {node: set() for node in nodes}
-    for item in normalized:
-        a, b = item["nodes"]
-        adjacency[a].add(b)
-        adjacency[b].add(a)
-    reached, queue = {"0"}, ["0"]
-    while queue:
-        for other in adjacency[queue.pop()] - reached:
-            reached.add(other)
-            queue.append(other)
-    if reached != nodes:
-        raise SchemeError(f"Floating circuit island(s): {sorted(nodes - reached)}")
+    if not isinstance(subcircuit, bool):
+        raise SchemeError("subcircuit must be a boolean.")
+    if interface_pins is not None:
+        if not subcircuit:
+            raise SchemeError("interface_pins is only valid for a subcircuit definition.")
+        interface_pins = _model_context({"_INTERFACE": {"pins": interface_pins, "path": "interface.scm"}})["_INTERFACE"]["pins"]
+    context = _model_context(model_context)
+    normalized, nodes, folded_nodes = _normalize_components(spec["components"], context)
+    if not nodes - {"0"}:
+        raise SchemeError("Circuit must contain a non-ground node.")
+    if not subcircuit:
+        if "0" not in nodes:
+            raise SchemeError("Circuit must reference ground node 0.")
+        adjacency = {node: set() for node in nodes}
+        for item in normalized:
+            terminals = item["nodes"]
+            # Controlled-source control and output branches are electrically
+            # separate. X is an opaque multiport here; its native definition
+            # determines internal coupling and operating-point solvability.
+            pairs = list(zip(terminals[::2], terminals[1::2])) if item["kind"] in {"G", "E", "F"} else list(zip(terminals, terminals[1:]))
+            for a, b in pairs:
+                adjacency[a].add(b)
+                adjacency[b].add(a)
+        reached, queue = {"0"}, ["0"]
+        while queue:
+            for other in adjacency[queue.pop()] - reached:
+                reached.add(other)
+                queue.append(other)
+        if reached != nodes:
+            raise SchemeError(f"Floating circuit island(s): {sorted(nodes - reached)}")
 
     raw_ports = spec.get("ports", {})
     if isinstance(raw_ports, list):
@@ -584,12 +769,15 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dic
             raise SchemeError(f"Port {alias} must reference an existing non-ground node.")
         if alias in nodes and alias != node:
             raise SchemeError(f"Port alias {alias} collides with another node name.")
-        if alias.casefold() in folded_nodes and folded_nodes[alias.casefold()] != alias:
+        if (alias.casefold() in folded_nodes and folded_nodes[alias.casefold()] != alias
+                and not (subcircuit and folded_nodes[alias.casefold()] == node)):
             raise SchemeError(f"Ambiguous port/node casing: {alias}")
         if alias.casefold() in port_spellings:
             raise SchemeError(f"Duplicate or ambiguous port alias: {alias}")
         ports[alias] = node
         port_spellings[alias.casefold()] = alias
+    if interface_pins is not None and set(ports) != {pin for side in _SIDES for pin in interface_pins[side]}:
+        raise SchemeError("Subcircuit ports must match interface_pins exactly.")
     analysis = _analysis_defaults()
     if spec.get("analysis") is not None and not isinstance(spec["analysis"], dict):
         raise SchemeError("analysis must be a mapping.")
@@ -597,25 +785,37 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dic
     for role in ("input", "output"):
         if options.get(role) is not None:
             options[role] = normalize_node(options[role])
+            if subcircuit and options[role] not in ports:
+                alias = next((alias for alias, node in ports.items() if node == options[role]), None)
+                if alias is None:
+                    raise SchemeError("Subcircuit analysis I/O must use declared external ports.")
+                options[role] = alias
     if "output" not in options:
-        options["output"] = "out" if "out" in nodes else next(n for n in sorted(nodes) if n != "0")
+        options["output"] = (next(iter(ports)) if subcircuit and ports else
+                             "out" if "out" in nodes else next(n for n in sorted(nodes) if n != "0"))
     _configure_analysis(analysis, options, nodes | set(ports))
     # Analysis node labels must exist in the native netlist. Give an explicit
     # test-point port to requested I/O only, never to every internal terminal.
-    for role in ("input", "output"):
-        name = options.get(role)
-        if name is not None and name in nodes and name not in ports:
-            ports[name] = name
+    if not subcircuit:
+        for role in ("input", "output"):
+            name = options.get(role)
+            if name is not None and name in nodes and name not in ports:
+                ports[name] = name
     from .layout import build_layout
     layout_options = spec.get("layout") or {}
-    if not isinstance(layout_options, dict) or set(layout_options) - {"placements", "nodes", "routes", "ports"}:
-        raise SchemeError("layout supports placements, nodes, routes and external ports.")
+    if not isinstance(layout_options, dict) or set(layout_options) - {"placements", "nodes", "routes", "ports", "density"}:
+        raise SchemeError("layout supports density, placements, nodes, routes and external ports.")
     layout = build_layout(normalized, ports, options, layout_options.get("placements"),
                           node_positions=layout_options.get("nodes"), routes=layout_options.get("routes"),
-                          port_positions=layout_options.get("ports"))
+                          port_positions=layout_options.get("ports"), density=layout_options.get("density", "compact"),
+                          **({"interface_pins": interface_pins} if interface_pins is not None else {}))
     objects, wires = layout["objects"], layout["wires"]
+    if interface_pins is not None:
+        _validate_interface_ports(objects, interface_pins)
     left, top, right, bottom = layout["bounds"]
     scale = max(15, min(100, int(100 * min(850/max(right-left, 1), 600/max(bottom-top, 1)))))
+    if layout.get("requires_native_scale100"):
+        scale = 100  # Native subcircuit caption sizing is zoom/font dependent.
     document = {"scm": {"MajorVersion": 5, "MinorVersion": 1,
                         "General": {"Scale": scale, "HPos": (left+right)//2,
                                     "VPos": (top+bottom)//2,
@@ -626,8 +826,12 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dic
                                    "Objects": objects, "Wires": wires}, **analysis}}
     # Validate the serialized electrical model before any filesystem mutation.
     summary = _summarize(document, Path(path).absolute(), "utf-8")
+    if len(normalized) != len(summary["components"]):
+        raise SchemeError("Internal component serialization validation failed.")
     node_mapping, reverse_mapping = {"0": "0"}, {"0": "0"}
     for expected, observed in zip(normalized, summary["components"]):
+        if len(expected["nodes"]) != len(observed["nodes"]):
+            raise SchemeError("Internal terminal-count validation failed.")
         for expected_node, observed_node in zip(expected["nodes"], observed["nodes"]):
             if node_mapping.setdefault(expected_node, observed_node) != observed_node or reverse_mapping.setdefault(observed_node, expected_node) != expected_node:
                 raise SchemeError("Internal physical-wire connectivity validation failed.")
@@ -636,9 +840,19 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False) -> dic
             raise SchemeError("External port connectivity validation failed.")
     written = _write_document(document, path, overwrite)
     summary["path"] = str(written)
-    summary["spec"] = {"components": normalized, "ports": ports, "analysis": options}
+    public_components = [{key: copy.deepcopy(value) for key, value in item.items()
+                          if not key.startswith("_native_") and not (item["kind"] == "X" and key == "nodes")}
+                         for item in normalized]
+    summary["spec"] = {"components": public_components, "ports": ports, "analysis": options,
+                       "layout": {**copy.deepcopy(layout_options), "density": layout["density"]}}
     summary["layout"] = {key: value for key, value in layout.items() if key not in {"objects", "wires", "component_ids"}}
     summary["node_mapping"] = node_mapping
+    if subcircuit:
+        summary["warnings"] = [warning for warning in summary["warnings"]
+                               if warning != "No ground object is present; native analyses may reject a floating circuit."]
+    summary["subcircuit"] = subcircuit
+    if interface_pins is not None:
+        summary["interface_pins"] = copy.deepcopy(interface_pins)
     return summary
 
 
@@ -664,7 +878,7 @@ def edit_component_values(source_path: str | Path, updates: dict, output_path: s
             raise SchemeError(f"Component {name!r} is absent or its name is ambiguous.")
         obj = by_name[name][0]
         kind = KINDS.get(obj.get("Type"))
-        if kind not in CREATE_KINDS:
+        if kind not in EDIT_KINDS:
             raise SchemeError(f"Editing {name} of type {kind or obj.get('Type')} is unsupported.")
         patch = update if isinstance(update, dict) else {"value": update}
         if set(patch) - {"value", "waveform"} or "value" not in patch:

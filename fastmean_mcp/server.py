@@ -30,7 +30,7 @@ from .schematic import create_circuit, edit_component_values, example_circuit, r
 from .symbolic import cirsym_from_fastmean_netlist, run_symbolic
 
 PROJECT = Path(__file__).resolve().parent.parent
-INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis. Start with status and example. Create circuits with adjacent components and real orthogonal wires; ports are external interfaces only. Use relayout for old port-stub circuits; preview returns a schematic PNG/SVG for visual inspection. AC/transient PNGs render native numerical data. Symbolic CIRSYM supports linear zero-state R/C/L and one voltage source, not arbitrary CAS. Use exact ports from inspect. Results persist with run_id, paged data and MCP artifact resources. Sources are never overwritten; each operation gets a private folder. Long native requests support cancellation of owned processes only. No Windows locale changes. Read fastmean://guide."""
+INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis. Start with status and example. Create circuits with adjacent components and real orthogonal wires; ports are external interfaces only. create_project builds portable native subcircuits from named fixed numeric definitions and complete pin connections; edit its saved project.spec.json and regenerate a new project to change definitions. Native instance parameter overrides are unsupported. annotate_circuit adds root numeric parameters, supported component bindings, explanatory text and saved TD/FD expressions to a new portable copy. Use relayout for old R/C/L/U port-stub circuits; preview returns a schematic PNG/SVG for supported geometry. AC/transient PNGs render native numerical data. Symbolic CIRSYM supports linear zero-state R/C/L and one voltage source, not arbitrary CAS or nonlinear models. Use exact ports from inspect. Results persist with run_id, paged data and MCP artifact resources. Sources are never overwritten; each operation gets a private folder. Long native requests support cancellation of owned processes only. GUI opening is a separate explicit open request; no desktop automation or Windows locale changes. Read fastmean://guide."""
 
 mcp = MCPServer(name="fastmean", title="FASTMEAN circuit analysis", version=__version__,
                 instructions=INSTRUCTIONS, log_level="WARNING")
@@ -40,6 +40,7 @@ ACTIVE_LOCK = threading.Lock()
 NATIVE_LOCK = asyncio.Lock()
 ACTIVE: dict[str, dict] = {}
 Signals = Annotated[list[str], Field(min_length=1, max_length=30)]
+SavedSignals = Annotated[list[str], Field(min_length=0, max_length=30)]
 Positive = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 
@@ -70,10 +71,10 @@ def store():
     return ArtifactStore(output_dir())
 
 
-async def native_operation(name, path, operation):
+async def native_operation(name, path, operation, timeout=None):
     """Keep SDK cancellation responsive while a native worker runs in a thread."""
     async with NATIVE_LOCK:
-        instance = engine()
+        instance = engine() if timeout is None else engine(timeout=timeout)
         operation_id = uuid4().hex
         finished = threading.Event()
         with ACTIVE_LOCK:
@@ -138,9 +139,9 @@ def source_path(path: str) -> Path:
     return result
 
 
-def engine():
+def engine(timeout=60):
     from .engine import Engine
-    return Engine(app_dir(), output_dir())
+    return Engine(app_dir(), output_dir(), timeout=timeout)
 
 
 def guide_text() -> str:
@@ -212,11 +213,16 @@ def fastmean_status() -> dict[str, Any]:
             "symbolic_available": bool(installation and (installation / "symbolic" / "cirsymw.exe").is_file()),
             "output_directory": str(output_dir()), "windows_locale_modified": False, "active_operations": active,
             "native_operations": ["AC frequency response", "transient analysis", "netlist export", "CIRSYM symbolic linear analysis"],
-            "authoring": "R, C, L and independent U/V sources; DC, sine and pulse waveforms",
+            "authoring": "R/C/L/U, fixed numeric native D/G/E/F primitives, portable X subcircuit projects; DC/sine/pulse U waveforms",
+            "hierarchy": {"native_type": 7100, "max_model_definitions": 99, "max_pins_per_model": 32,
+                          "parameter_overrides_supported": False,
+                          "editing": "Modify saved project.spec.json and create a new project; originals remain unchanged"},
+            "annotations": "Root numeric .parameter constants, R/C/L/U bindings, explanatory TEXT and saved TD/FD signal expressions in a new copy",
             "plot_origin": "Matplotlib PNG rendered from the native FASTMEAN numeric export",
-            "layout": "Real orthogonal wires, native junctions, adjacent components, bottom ground rail; external ports only",
+            "layout": "Compact spacing by default; real orthogonal wires, native junctions, bottom ground rail; external ports only",
             "limits_numeric": {"max_ac_points": 10000, "max_transient_steps": 1000000, "max_signals": 30, "native_timeout_seconds": 60},
             "limits": ["No arbitrary CAS equation solver", "Symbolic adapter requires linear zero-state circuits",
+                       "Native instance parameter overrides and arbitrary BJT/SPICE model import are unsupported",
                        "Legacy binary SCM files are not parsed", "DEMO installation may limit circuit size"]}
 
 
@@ -241,22 +247,87 @@ def fastmean_create_circuit(spec: dict, name: str = "circuit") -> dict[str, Any]
     Components connect through physical wires and junctions; ports are external
     I/O only. Optional spec.layout.placements maps names to {x,y,rotation}; x/y
     are multiples of 20 and rotation is 0=left/right,1=up/down,2/3=reversed.
+    spec.layout.density is compact (default) or standard. Explicit coordinates
+    stay unchanged; density controls automatic spacing only.
     All names used in analysis must be ASCII. Does not open a window.
+    Fixed native primitives: D uses parameters={Ron,Roff,Uon}; G/VCCS,
+    E/VCVS and F/CCCS use four native-ordered nodes and a numeric value.
+    Use fastmean_create_project for X subcircuits and portable model files.
     """
     filename = _filename(name)
     job = new_job("create")
     return store().publish(create_circuit(spec, job / filename))
 
 
+@mcp.tool(annotations=WRITE, structured_output=True)
+@tool_errors
+def fastmean_create_project(spec: dict, name: str = "project") -> dict[str, Any]:
+    """Create a portable native root circuit and fixed numeric subcircuit files.
+
+    spec={name?,models:{MODEL:{pins:{Left:[B],Top:[C],Right:[],Bottom:[E]},
+    circuit:{components:[...],ports:{B:b,C:c,E:e}}}},circuit:rootCircuit}.
+    X components use {kind:X,name:Q1,model:MODEL,connections:{B:base,C:col,E:0}}.
+    Side lists determine native terminal numbering Left,Top,Right,Bottom.
+    A definition may float; ports must match declared pins exactly. All models
+    must exist and be acyclic; instance parameters and .parameter headers are
+    unsupported. Other components use the create_circuit schema. Each circuit
+    supports compact/standard density and explicit coordinates independently.
+    Return main.scm, models/*.scm, original JSON specs, hashes and a manifest.
+    To edit definitions, modify the saved project.spec.json and call this tool
+    again: every call creates a new project and preserves the previous files.
+    Does not launch FASTMEAN, calculations, GUI or desktop automation.
+    """
+    from .hierarchy import create_project
+    directory_name = _filename(name)[:-4]
+    job = new_job("project")
+    result = create_project(spec, job / directory_name)
+    result.update({"working_dir": str(job), "analysis": "create_project", "ok": True,
+                   "origin": "Native SCM project authored by MCP; no analysis performed"})
+    return store().publish(result)
+
+
 @mcp.tool(annotations=READ, structured_output=True)
 @tool_errors
 def fastmean_inspect(path: str, include_objects: bool = False) -> dict[str, Any]:
-    """Read a text SCM: components, values, native nodes, named ports and settings."""
+    """Read a text SCM: components, native pins, X connections, ports and settings."""
     result = read_scheme(source_path(path))
     if not include_objects:
         result.pop("objects", None)
     from .artifacts import bounded_result
     return bounded_result(result)
+
+
+@mcp.tool(annotations=WRITE, structured_output=True)
+@tool_errors
+def fastmean_annotate_circuit(path: str, parameters: dict | None = None, bindings: dict | None = None,
+                              descriptions: list[str] | None = None, td_signals: SavedSignals | None = None,
+                              fd_signals: SavedSignals | None = None) -> dict[str, Any]:
+    """Add numeric constants, text explanations and saved native formulas to a copy.
+
+    parameters maps ASCII identifiers to finite numbers/SI literals. bindings
+    maps existing root R/C/L/U names to approved parameter expressions; native
+    child-instance parameter overrides are unsupported. descriptions adds plain
+    explanatory native TEXT objects. [] clears saved traces; None preserves them.
+    td_signals/fd_signals replace saved active
+    expressions, for example U(OUT), I(RL), db(U(OUT)/U(IN)), phs(U(OUT)/U(IN)).
+    Root TD/FD settings are retained, requested expressions are preloaded, and
+    SCM model dependencies are privately packaged. Sources remain unchanged.
+    Does not launch calculations, a window or desktop automation.
+    """
+    from .annotations import annotate_circuit
+    source = source_path(path)
+    job = new_job("annotate")
+    result = annotate_circuit(source, job / "circuit.scm", parameters=parameters, bindings=bindings,
+                              descriptions=descriptions, td_signals=td_signals, fd_signals=fd_signals)
+    dependencies = []
+    for value in result.get("dependency_paths", []):
+        private = Path(value).resolve(strict=True)
+        if not private.is_relative_to(job.resolve()) or private.suffix.lower() != ".scm":
+            raise ValueError("An annotation dependency escaped its private SCM job.")
+        dependencies.append({"path": str(private)})
+    result.update({"working_dir": str(job), "analysis": "annotate", "dependency_artifacts": dependencies,
+                   "ok": True, "origin": "Native SCM annotations authored by MCP; no analysis performed"})
+    return store().publish(result)
 
 
 @mcp.tool(annotations=WRITE, structured_output=True)
@@ -270,6 +341,23 @@ def fastmean_edit_values(path: str, updates: dict) -> dict[str, Any]:
     source = source_path(path)
     job = new_job("edit")
     return store().publish(edit_component_values(source, updates, job / "edited.scm"))
+
+
+@mcp.tool(annotations=WRITE)
+@tool_errors
+async def fastmean_export_netlist(path: str,
+        timeout: Annotated[float, Field(ge=1, le=60, allow_inf_nan=False)] = 60) -> CallToolResult:
+    """Export the installed FASTMEAN engine's native expanded circuit netlist.
+
+    Opens a sanitized recursive working copy in a private batch process, runs
+    save_netlist and exits. Returns bounded text, full netlist and provenance
+    artifacts. Does not launch a GUI or request AC/transient simulation.
+    timeout limits only this owned worker to 1–60 seconds; cancellation uses
+    the same owned-process mechanism as other native operations.
+    """
+    source = source_path(path)
+    result = await native_operation("netlist", source, lambda native: native.export_netlist(source), timeout=timeout)
+    return _with_image(result)
 
 
 @mcp.tool(annotations=WRITE)
@@ -293,16 +381,18 @@ async def fastmean_ac(path: str, signals: Signals | None = None, fmin: Positive 
 @mcp.tool(annotations=WRITE)
 @tool_errors
 async def fastmean_transient(path: str, signals: Signals | None = None, stop: Positive = .01,
-                       step: Positive = 1e-5, eps: Annotated[float, Field(gt=0, le=.1, allow_inf_nan=False)] = 1e-5) -> CallToolResult:
+                       step: Positive = 1e-5, eps: Annotated[float, Field(gt=0, le=.1, allow_inf_nan=False)] = 1e-5,
+                       timeout: Annotated[float, Field(ge=1, le=60, allow_inf_nan=False)] = 60) -> CallToolResult:
     """Run native time-domain analysis; return native samples, CSV and PNG.
 
     Examples: U(out), U(in), I(R1). Seconds and SI values are numeric. Starts at
     time zero with the schematic's component IC values; no saved-state files.
+    timeout limits this owned worker to 1–60 seconds (default 60).
     """
     source = source_path(path)
     if signals is None:
         signals = _saved_signals(source, "TD")
-    result = await native_operation("transient", source, lambda native: native.run_transient(source, signals, stop, step, eps))
+    result = await native_operation("transient", source, lambda native: native.run_transient(source, signals, stop, step, eps), timeout=timeout)
     return _with_image(result)
 
 
@@ -352,22 +442,36 @@ def fastmean_list_examples(query: str = "") -> dict[str, Any]:
 def fastmean_open(path: str) -> dict[str, Any]:
     """Open a working copy through the installed FASTMEAN executable's documented CLI.
 
+    Recursively packages SCM model dependencies and records source/copy hashes.
     Starts a separate application process; leaves existing windows alone. The
     circuit window stays open for the user, and is not controlled automatically.
     This command does not apply locale emulation; old Russian UI text may appear
     garbled on Windows configured for another legacy code page.
     """
     source = source_path(path)
-    # Validate the SCM before opening; the native engine applies any directives.
-    from .engine import prepare_copy
-    job = new_job("open")
-    copied = prepare_copy(source, job / "circuit.scm")
-    installation = app_dir()
-    exe = installation / "Fastmean.exe"
+    # The existing project preparer validates every model before any GUI launch;
+    # it performs no calculation and keeps file directives disabled in copies.
+    instance = engine()
+    job, manifest = instance._job(source, "open")
+    copied = Path(manifest["private_schematic"])
+    exe = instance.executable
     command = [str(exe), "-o", str(copied)]
-    process = subprocess.Popen(command, cwd=str(job), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {"ok": True, "path": str(copied), "source": str(source), "pid": process.pid,
-            "russian_launcher": False, "message": "Started native FASTMEAN with a working copy. No locale emulation is applied."}
+    try:
+        process = subprocess.Popen(command, cwd=str(job), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        manifest.update({"status": "failed", "error": str(error), "command": command})
+        instance._manifest(job, manifest)
+        raise
+    manifest.update({"status": "opened", "pid": process.pid, "command": command,
+                     "analysis_requested": False, "gui_owned_by_user": True})
+    instance._manifest(job, manifest)
+    return store().publish({"ok": True, "analysis": "open", "working_dir": str(job),
+            "path": str(copied), "source": str(source), "source_path": str(source),
+            "source_sha256": manifest["source_sha256"], "source_models": manifest["source_models"],
+            "models": [{"path": item["private_path"], "sha256": item["private_sha256"]}
+                       for item in manifest["source_models"]],
+            "manifest_path": str(job / "manifest.json"), "engine": manifest["engine"], "pid": process.pid,
+            "russian_launcher": False, "message": "Started native FASTMEAN with a recursively packaged working copy. No locale emulation is applied."})
 
 
 @mcp.tool(annotations=READ, structured_output=True)
@@ -385,16 +489,19 @@ def fastmean_search_manual(query: str) -> dict[str, Any]:
 
 @mcp.tool(annotations=WRITE, structured_output=True)
 @tool_errors
-def fastmean_relayout(path: str, placements: dict | None = None) -> dict[str, Any]:
+def fastmean_relayout(path: str, placements: dict | None = None,
+                      density: Literal["compact", "standard"] = "compact") -> dict[str, Any]:
     """Rebuild a supported circuit as adjacent components with physical wires.
 
     Converts old per-pin PORT layouts into a connected orthogonal drawing.
     Preserves values, waveforms and native analysis in a new SCM. Supports
     R/C/L/U circuits. Optional placements: {R1:{x:960,y:1000,rotation:0}}.
+    density selects compact (default) or the previous standard spacing.
     """
     from .relayout import relayout_circuit
     job = new_job("layout")
-    return store().publish(relayout_circuit(source_path(path), job / "circuit.scm", placements=placements))
+    return store().publish(relayout_circuit(source_path(path), job / "circuit.scm",
+                                          placements=placements, density=density))
 
 
 @mcp.tool(annotations=WRITE)
@@ -403,7 +510,8 @@ def fastmean_preview(path: str) -> CallToolResult:
     """Render a wire-connected SCM to readable PNG and SVG for visual review.
 
     This is an MCP rendering of native objects, not a FASTMEAN screenshot.
-    Unknown symbols or implicit bends are rejected; use fastmean_open for them.
+    Proven native L/midpoint bends are reconstructed exactly. Unsupported
+    symbols/detours are rejected. No application window is opened.
     """
     from .preview import render_schematic
     source = source_path(path)

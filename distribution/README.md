@@ -3,6 +3,11 @@ FASTMEAN, its solvers, fonts, or locale-emulation binaries. Install and license
 FASTMEAN 6.1/6.0 separately. Windows, an existing Python 3.12+ with `venv`, and
 Codex CLI are prerequisites. Dependency installation needs normal pip access.
 
+These automated installers register Codex. For **Claude, Kimi, DeepSeek/Cline**
+and a manual installation that does not require Codex, see
+[AI client profiles](../docs/ai-clients.md). The installed package can export
+fresh client JSON with `python -m fastmean_mcp.client_config`.
+
 From a reviewed checkout, use the existing Python interpreter:
 
 ```text

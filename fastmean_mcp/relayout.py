@@ -141,6 +141,7 @@ def relayout_circuit(
     source_path: str | Path,
     output_path: str | Path,
     placements: dict[str, dict] | None = None,
+    density: str = "compact",
 ) -> dict[str, Any]:
     """Create a wire-connected copy of an existing R/C/L/U text schematic.
 
@@ -195,8 +196,9 @@ def relayout_circuit(
     spec: dict[str, Any] = {"components": components,
                             "ports": {alias: logical_nodes[node] for alias, node in ports.items()},
                             "analysis": options}
+    spec["layout"] = {"density": density}
     if placements is not None:
-        spec["layout"] = {"placements": placements}
+        spec["layout"]["placements"] = placements
 
     # Same-volume staging allows atomic, exclusive hard-link publication on
     # NTFS/POSIX: readers never see a partial file and an existing file is never
