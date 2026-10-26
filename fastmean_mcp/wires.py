@@ -24,7 +24,7 @@ def terminal(obj, pin):
         from .native_geometry import pin_positions, pin_directions
         return pin_positions(obj)[pin], pin_directions(obj)[pin]
     p = (obj['X'], obj['Y'])
-    if tid in {1000, 1001, 1002, 2010}:
+    if tid in {1000, 1001, 1002, 2010, 3010}:
         d = DIRECTIONS[(rot + (0 if pin == 1 else 2)) % 4]
         return (p[0] + 40*d[0], p[1] + 40*d[1]), d
     if tid == 300:

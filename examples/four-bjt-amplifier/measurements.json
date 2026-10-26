@@ -1,21 +1,20 @@
 {
-  "origin": "FASTMEAN native transient numeric export; integration/FFT by NumPy",
-  "native_run_id": "20261026T191743_788832Z_70be6b5a7903_transient",
+  "origin": "FASTMEAN native transient numeric export; measurements by MCP fastmean_plot, independently checked with NumPy",
+  "native_run_id": "20261026T204941_292606Z_1a225b040348_transient",
   "csv_path": "native-transient-last10ms.csv",
   "window_s": [
     0.29,
     0.3
   ],
-  "input_rms_v": 0.9999829994948763,
-  "output_rms_v": 25.00251507427968,
-  "load_rms_a": 20.00201205942374,
-  "load_mean_w": 500.100725498907,
-  "input_rms_a": 0.06680340660463535,
-  "input_peak_a": 0.0944608774524016,
-  "output_dc_v": 8.618709620988866e-07,
-  "thd_2_to_10_percent": 0.24929787200786732,
-  "output_min_v": -35.3956091193476,
-  "output_max_v": 35.39561123574,
+  "input_rms_v": 0.9999829994942263,
+  "output_rms_v": 25.00251507405973,
+  "load_rms_a": 20.002012059247782,
+  "load_mean_w": 500.10072549010783,
+  "input_rms_a": 0.06680340660456578,
+  "input_peak_a": 0.0944608774526847,
+  "output_dc_v": 8.619948319368846e-07,
+  "output_min_v": -35.3956091189823,
+  "output_max_v": 35.3956112356206,
   "note": "PWL nominal electrical model; no SOA, thermal or hardware validation.",
   "native_engine": "FASTMEAN 6.1 native CLI",
   "request": {
@@ -41,18 +40,84 @@
     "boundary_context_note": "One unmodified native row immediately before 0.29 s supports linear interpolation at the exact window boundary. All original retained records are unchanged."
   },
   "integration": "Interpolate signals at exact 0.29 and 0.30 s boundaries, then trapezoidal integration on original adaptive timestamps; RMS = sqrt(integral(signal^2)/duration).",
-  "thd_note": "Original NumPy FFT estimate for harmonics 2 through 10; sensitive to interpolation and FFT endpoint conventions; not hardware THD.",
-  "full_native_csv_sha256": "20aaf5282e36450d010a9181bf29a632738aa44e4671b3c524f84f9641772677",
+  "full_native_csv_sha256": "c2cbfcbe08a59352cccc9f4e04601e0bfdcae917da4643173f88a854257fcfed",
   "full_native_csv_rows": 31204,
-  "connectivity": {
-    "method": "Scoped leaf-terminal connectivity partitions from original logical project JSON compared with native expanded netlist",
-    "expected_components": 60,
-    "native_components": 60,
-    "terminal_count": 136,
-    "expected_net_count": 43,
-    "native_net_count": 43,
-    "matching_partitions": 43,
-    "split_nets": 0,
-    "merged_nets": 0
+  "mcp_plot": {
+    "display_window_s": [
+      0.297,
+      0.3
+    ],
+    "measurement_window_s": [
+      0.29,
+      0.3
+    ],
+    "panels": [
+      {
+        "signal": "U(IN)",
+        "label": "Input voltage",
+        "unit": "V",
+        "scale": 1.0,
+        "metrics": [
+          "rms"
+        ],
+        "guides": [],
+        "color": "#2563eb"
+      },
+      {
+        "signal": "U(OUT)",
+        "label": "Output voltage",
+        "unit": "V",
+        "scale": 1.0,
+        "metrics": [
+          "rms"
+        ],
+        "guides": [],
+        "color": "#0f807b"
+      },
+      {
+        "signal": "I(RL)",
+        "label": "Load current",
+        "unit": "A",
+        "scale": 1.0,
+        "metrics": [
+          "rms"
+        ],
+        "guides": [],
+        "color": "#7c3aed"
+      },
+      {
+        "signal": "I(VIN)",
+        "label": "Input current",
+        "unit": "mA",
+        "scale": 1000.0,
+        "metrics": [
+          "rms",
+          "peak"
+        ],
+        "guides": [],
+        "color": "#c2410c"
+      },
+      {
+        "signal": "U(OUT)*I(RL)",
+        "label": "Load power",
+        "unit": "W",
+        "scale": 1.0,
+        "metrics": [
+          "mean"
+        ],
+        "guides": [
+          "mean"
+        ],
+        "color": "#64748b"
+      }
+    ],
+    "method": {
+      "mean": "trapezoid(y, t) / duration",
+      "rms": "sqrt(trapezoid(y**2, t) / duration)",
+      "peak": "max(abs(y)) at native samples and interpolated window endpoints",
+      "boundaries": "piecewise-linear interpolation; original adaptive timestamps; no extrapolation",
+      "values": "metrics use native exported column values; display_metrics apply panel scale"
+    },
+    "source_csv_sha256": "c2cbfcbe08a59352cccc9f4e04601e0bfdcae917da4643173f88a854257fcfed"
   }
 }

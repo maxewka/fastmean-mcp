@@ -1,5 +1,70 @@
 # Validation history
 
+## 1.2.0: saved-data plotting, current sources and reference layouts
+
+Local Windows / FASTMEAN 6.1 checks on 2026-10-26: **196 passed, 5 skipped,
+224 subtests**,70.09seconds, with both native flags enabled. Portable checks
+with the executable intentionally absent: **179 passed,22 skipped,222 subtests**,
+34.49seconds. An additional final regression applies the public amplifier
+annotation request and verifies zero caption crossings afterward. Skips concern
+platform privileges and the existing PowerShell policy; no settings changed.
+
+The normal Python installer upgraded the owned installation to1.2.0 after a
+successful dry run. Doctor completed a real stdio initialize/discovery/status
+check with **21 tools**; all19 installed Python/data files matched the reviewed
+source bytes. Hosted Windows/Ubuntu checks run separately through the linked
+GitHub Actions workflow; local results are not presented as hosted results.
+
+A fresh local session using the official MCP SDK over stdio initialized the
+current source as **1.2.0**, discovered **21 tools**, and called status with no
+active native operations. Source discovery and the separate installed-package doctor check both passed.
+No third-party model-account test is claimed.
+
+- `fastmean_plot` renders registered native AC/transient data as MCP images,
+  PNG and SVG without another simulation. Display and measurement windows are
+  independent. Transient measurements interpolate interval boundaries and use
+  trapezoidal integration on the original timestamps; panel units/scales affect
+  displayed metrics while raw metrics retain native values. See
+  [plotting definitions and arguments](PLOTTING.md).
+- Independent current sources use `nodes=[from,to]`, with positive current from
+  the first node to the second, and support DC, sine and pulse authoring.
+  Voltage sources retain `nodes=[positive,negative]`. Native current-column sign
+  conventions remain separate from these physical direction definitions.
+  Native AC fixtures use sine excitation; DC-only sources do not excite AC.
+- Routing keeps native terminal anchors, genuine junctions and visible retained
+  routing waypoints. Manual positions accept four-unit coordinates; automatic
+  spacing remains on a twenty-unit grid. Caption clearance includes primitive,
+  controlled-source and subcircuit labels. Optional local ground symbols retain
+  the same electrical ground without an artificial bottom return rail.
+- The [external-reference benchmark](../benchmarks/reference-circuits/README.md)
+  contains our original circuit transcriptions, separately declared nominal
+  values and test stimuli, independent analytical expectations and actual MCP
+  preview artifacts. Its [sanitized native report](../benchmarks/reference-circuits/validation-report.json)
+  separates primary/secondary AC, supported transient checks and runtime
+  failures. Original textbook-derived scans remain private; source links and
+  image hashes establish provenance without redistributing their pixels.
+- The [four-BJT example](../examples/four-bjt-amplifier/README.md) uses fixed
+  nominal piecewise-linear equivalents. Its [model notes](../examples/four-bjt-amplifier/MODELS.md)
+  distinguish the compact beta form from the historical alpha regression
+  fixture and explain the terminal-equivalence calculation. The native netlist
+  audit and numerical measurements are distinct from schematic rendering.
+
+FASTMEAN exports numerical samples; MCP renders schematic previews and plots.
+Neither preview type is a screenshot of FASTMEAN's UI or proprietary fonts.
+The renderer and reference-layout review do not promise pixel-identical copies
+or a perfect automatic layout for an arbitrary graph.
+
+The compensated RC benchmark's native transient timed out with both DC and
+delayed finite-rise pulse excitation. Its topology is preserved and acceptance
+is AC-only; no native transient/DC pass is claimed. The ideal RLC source path
+has no finite steady DC current, so its benchmark uses positive-frequency AC.
+Phase at its ideal transfer zero is undefined and excluded from the notch
+check. The amplifier's nominal PWL results do not establish thermal behavior,
+SOA, high-frequency performance or physical hardware suitability.
+
+No native application binaries, proprietary fonts, manual PDFs, original
+reference scans, private paths or raw local logs are part of these additions.
+
 ## 1.1.0: native projects, annotations, bend cleanup and client profiles
 
 Local Windows / FASTMEAN 6.1 on 2026-10-26: **159 passed, 4 skipped,
@@ -161,3 +226,9 @@ Native executable SHA256 used for these checks:
 `a001582ada87cdf013605f43b019957ae23204ef4bfcc33be02a0681b186ee25`.
 The native application, private coursework, PDFs and raw local validation logs
 are not distributed.
+
+The 1.2.0 layout holdout also rebuilt the attributed Point75A reference through
+actual MCP create/preview calls:29components,4ports,24 genuine junctions,
+zero retained routing waypoints and no warnings. Visual review found clean
+three-stage wiring and readable labels. This holdout started no native solver;
+its purpose was independent layout coverage beyond the small reference cases.

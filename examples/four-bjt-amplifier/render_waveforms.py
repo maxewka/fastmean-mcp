@@ -62,18 +62,18 @@ def main():
             axis.margins(y=.1)
         axes[-1].axhline(result["load_mean_w"], color="#334155", linewidth=1.25, linestyle="--")
         axes[-1].set_xlabel("Время, мс", fontsize=11)
-        figure.text(.5, .038, "Числа экспортированы нативным FASTMEAN; графики построены Matplotlib через MCP.",
+        figure.text(.5, .038, "Числа экспортированы нативным FASTMEAN; графики повторно построены локальным скриптом Matplotlib.",
                     ha="center", fontsize=9, color="#64748b")
         figure.text(.5, .019, "Учебная номинальная PWL-модель · без тепловой проверки и SOA · не проект для сборки",
                     ha="center", fontsize=9, color="#a24c1d")
-        figure.savefig(ROOT / "waveforms.png", dpi=160, facecolor="white",
+        figure.savefig(ROOT / "offline-waveforms.png", dpi=160, facecolor="white",
                        metadata={"Creator": "FASTMEAN MCP / Matplotlib"})
-        figure.savefig(ROOT / "waveforms.svg", facecolor="white",
+        figure.savefig(ROOT / "offline-waveforms.svg", facecolor="white",
                        metadata={"Creator": "FASTMEAN MCP / Matplotlib", "Date": None})
-        svg = ROOT / "waveforms.svg"
+        svg = ROOT / "offline-waveforms.svg"
         svg.write_bytes(b"\n".join(line.rstrip(b" \t\r") for line in svg.read_bytes().split(b"\n")))
         figure.clear()
-    print("Rendered waveforms.png/svg from the five published native signal columns.")
+    print("Rendered offline-waveforms.png/svg from the five published native signal columns.")
 
 
 if __name__ == "__main__":

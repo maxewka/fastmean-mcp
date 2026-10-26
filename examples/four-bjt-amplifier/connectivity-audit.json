@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "oracle": "Logical project JSON recursively flattened; native netlist compared as partitions of scoped (leaf component,pin) terminals. Native node numbers do not define expected nets.",
+  "project_spec_path": "project.input.json",
+  "project_spec_sha256": "22fe3ca788ef726b883c24a59e7f1358f5a0d41f24c48f6fe5de070a82072620",
+  "native_netlist_path": "native-netlist.txt",
+  "native_netlist_sha256": "73fd5637edafcee4358b730d4c23b596eb6c7f6b17b75098887dc139e37c2777",
+  "expected_components": 60,
+  "native_components": 60,
+  "expected_terminal_count": 136,
+  "expected_net_count": 43,
+  "native_net_count": 43,
+  "matching_partition_count": 43,
+  "missing_components": [],
+  "unknown_native_components": [],
+  "split_expected_nets": [],
+  "merged_expected_nets": []
+}

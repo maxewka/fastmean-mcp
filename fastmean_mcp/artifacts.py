@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import copy
 import csv
+from array import array
 from datetime import datetime, timezone
 import hashlib
+import io
 import json
 import math
 import os
@@ -22,7 +24,8 @@ _KNOWN = frozenset({"data.csv", "plot.png", "schematic.svg", "schematic.png", "c
     "stderr.txt", "out", "cir", "human.sym", "mcp-result-full.json"})
 _DECLARED = frozenset({"path", "csv_path", "plot_path", "svg_path", "png_path", "data_path",
     "native_data_path", "manifest_path", "script_path", "native_output_path", "input_path",
-    "settings_path", "output_path", "stdout_path", "stderr_path", "scm_path", "circuit_path"})
+    "settings_path", "output_path", "stdout_path", "stderr_path", "scm_path", "circuit_path",
+    "spec_path", "measurements_path"})
 _MIMES = {".csv": "text/csv", ".png": "image/png", ".svg": "image/svg+xml",
           ".scm": "text/plain", ".json": "application/json", ".txt": "text/plain"}
 _PRIORITY = frozenset({"ok", "error", "status", "code", "run_id", "resource_uri",
@@ -362,3 +365,96 @@ class ArtifactStore:
                 "limit": limit, "returned_count": len(rows), "has_more": more,
                 "next_offset": offset + len(rows) if more else None,
                 "csv_artifact": entry["name"], "resource_uri": entry["uri"]}
+
+    def load_native_data(self, run_id: str) -> dict:
+        """Read a verified registered native table for internal post-processing.
+
+        This is not an arbitrary-file endpoint. Unlike resource reads, it permits
+        the engine's complete 256 MiB table, streaming a digest while parsing into
+        compact numeric columns. Large CSVs are authenticated by the published
+        native manifest's csv_sha256, even when the artifact catalog omits a hash.
+        """
+        record = self.get_run(run_id)
+        analysis = record.get("analysis")
+        if analysis not in {"ac", "transient"}:
+            raise ArtifactError("Select an original native AC or transient run, not a preview or plot run.")
+        manifest = json.loads(self.read_artifact(run_id, "manifest.json").decode("utf-8"))
+        if (not isinstance(manifest, dict) or manifest.get("status") != "completed"
+                or manifest.get("analysis") != analysis
+                or not isinstance(manifest.get("engine"), dict)
+                or manifest["engine"].get("name") != "FASTMEAN native CLI"):
+            raise ArtifactError("Run has no completed native FASTMEAN data manifest.")
+        expected_hash = manifest.get("csv_sha256")
+        native_hash = manifest.get("native_data_sha256")
+        if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value)
+               for value in (expected_hash, native_hash)):
+            raise ArtifactError("Native manifest has no recognized CSV/native-data SHA256 provenance.")
+        path, entry, _ = self._artifact(run_id, "data.csv")
+        maximum_bytes, maximum_rows = 256 * 1024 * 1024, 10000 if analysis == "ac" else 1000001
+        if path.stat().st_size > maximum_bytes:
+            raise ArtifactError("Native CSV exceeds the 256 MiB limit.")
+
+        class DigestReader(io.RawIOBase):
+            def __init__(self, raw):
+                self.raw, self.digest, self.count = raw, hashlib.sha256(), 0
+
+            def readable(self):
+                return True
+
+            def readinto(self, buffer):
+                count = self.raw.readinto(buffer)
+                if count:
+                    self.count += count
+                    if self.count > maximum_bytes:
+                        raise ArtifactError("Native CSV exceeds the 256 MiB limit.")
+                    self.digest.update(memoryview(buffer)[:count])
+                return count
+
+        try:
+            with path.open("rb") as raw:
+                if os.fstat(raw.fileno()).st_size != entry["size"]:
+                    raise ArtifactError("Artifact changed after publication.")
+                hashed = DigestReader(raw)
+                with io.TextIOWrapper(io.BufferedReader(hashed), encoding="utf-8-sig", newline="") as stream:
+                    reader = csv.reader(stream)
+                    header = next(reader, None)
+                    expected_axis = "f" if analysis == "ac" else "t"
+                    if (not header or not 2 <= len(header) <= 31 or header[0] != expected_axis
+                            or len(set(header)) != len(header)
+                            or any(not item or len(item) > 512 for item in header)
+                            or sum(len(item.encode("utf-8")) for item in header) > 32768
+                            or header != manifest.get("columns")):
+                        raise ArtifactError("Native CSV has invalid, duplicate or mismatched columns.")
+                    values = [array("d") for _ in header]
+                    count, previous = 0, None
+                    for row in reader:
+                        count += 1
+                        if count > maximum_rows:
+                            raise ArtifactError("Native CSV exceeds its analysis row limit.")
+                        if len(row) != len(header):
+                            raise ArtifactError(f"CSV row {count} has the wrong column count.")
+                        numbers = [float(item) for item in row]
+                        if not all(math.isfinite(item) for item in numbers):
+                            raise ArtifactError(f"CSV row {count} contains nonfinite values.")
+                        if (previous is not None and numbers[0] <= previous) or numbers[0] < 0 or (analysis == "ac" and numbers[0] == 0):
+                            raise ArtifactError("Native CSV axis must be finite, valid and strictly increasing.")
+                        previous = numbers[0]
+                        for column, number in zip(values, numbers):
+                            column.append(number)
+                    digest, bytes_read = hashed.digest.hexdigest(), hashed.count
+            if digest != expected_hash.lower() or (entry.get("sha256") and digest != entry["sha256"]):
+                raise ArtifactError("Native CSV SHA256 changed after publication.")
+            if bytes_read != entry["size"] or count != manifest.get("row_count") or count < 2:
+                raise ArtifactError("Native CSV size or row count disagrees with its manifest.")
+        except (OSError, UnicodeError, csv.Error, ValueError, TypeError) as error:
+            if isinstance(error, ArtifactError):
+                raise
+            raise ArtifactError(f"Could not read verified native CSV data: {error}") from error
+        return {"columns": header, "values": values, "row_count": count,
+                "analysis": analysis, "request": manifest.get("request", {}),
+                "provenance": {"source_run_id": run_id, "source_resource_uri": record["resource_uri"],
+                    "csv_resource_uri": entry["uri"], "csv_sha256": digest,
+                    "native_data_sha256": native_hash.lower(),
+                    "source_sha256": manifest.get("source_sha256"),
+                    "engine": {key: value for key, value in manifest["engine"].items() if key in {"name", "sha256"}},
+                    "native_request": manifest.get("request", {})}}

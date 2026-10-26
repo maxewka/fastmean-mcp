@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fastmean_mcp.layout import LayoutError, _split_overlapping_edges
+from fastmean_mcp.layout import LayoutError, _split_overlapping_edges, _prune_unused_leaves
 from fastmean_mcp.schematic import SchemeError, create_circuit, example_circuit
 
 
@@ -25,6 +25,16 @@ class LayoutTests(unittest.TestCase):
         for point, neighbors in normalized.items():
             directions={((p[0]>point[0])-(p[0]<point[0]),(p[1]>point[1])-(p[1]<point[1])) for p in neighbors}
             self.assertEqual(len(directions),len(neighbors))
+
+    def test_native_lead_normalization_does_not_leave_a_dangling_con(self):
+        graph={(1048,860):{(1040,860),(1048,892)},
+               (1040,860):{(1048,860),(1060,860)},
+               (1060,860):{(1040,860)},(1048,892):{(1048,860)}}
+        required={(1060,860),(1048,892)}
+        result=_prune_unused_leaves(_split_overlapping_edges(graph),required)
+        self.assertNotIn((1040,860),result)
+        self.assertEqual({p for p,links in result.items() if len(links)==1},required)
+        self.assertEqual(_prune_unused_leaves(_split_overlapping_edges(result),required),result)
 
     def test_distinct_net_overlapping_routes_rejected_before_writing(self):
         spec = example_circuit()
@@ -131,6 +141,17 @@ class LayoutTests(unittest.TestCase):
             with self.subTest(density=density), self.assertRaisesRegex(LayoutError, "density"):
                 create_circuit(spec, target)
             self.assertFalse(target.exists())
+
+    def test_sole_output_faces_right_and_explicit_same_node_input_retains_priority(self):
+        spec={"components":[{"kind":"R","name":"R1","nodes":["out","0"],"value":1000}],
+              "ports":["out"],"analysis":{"output":"out"}}
+        result=create_circuit(spec,self.root/"sole-output.scm")
+        port=next(o for o in result["objects"] if o["Type"]==400)
+        self.assertEqual((port["X"],port["Rot"]),(920,0))
+        spec["analysis"]["input"]="out"
+        result=create_circuit(spec,self.root/"explicit-input.scm")
+        port=next(o for o in result["objects"] if o["Type"]==400)
+        self.assertEqual((port["X"],port["Rot"]),(680,2))
 
 
 if __name__ == "__main__":

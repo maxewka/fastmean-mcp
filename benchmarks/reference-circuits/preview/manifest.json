@@ -1,0 +1,94 @@
+[
+  {
+    "id": "compensated-rc-divider",
+    "mode": "guided",
+    "preview_run_id": "schematic-preview-4092jlkm",
+    "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+    "source": {
+      "repo": "jitendra-bhandari/Masala-CHAI",
+      "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+      "path": "Dataset/data_5/8.JPG",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/8.JPG",
+      "image_sha256": "D456FE1E84D75713703BAF65A64DFABA898FA734A2A4C4ED8F4BF04670FBD6B3"
+    },
+    "assets": {
+      "png": {
+        "file": "preview/compensated-rc-divider.png",
+        "sha256": "3f63e9a108bdfdd691616df1b315e8191b0e71da63308c68565c943f05bf416c"
+      },
+      "svg": {
+        "file": "preview/compensated-rc-divider.svg",
+        "sha256": "0e39b3c6728883715fcb9f082e487c4c12fda967284773d6e81181df08218c98"
+      }
+    }
+  },
+  {
+    "id": "parallel-current-divider",
+    "mode": "guided",
+    "preview_run_id": "schematic-preview-ht1jarz8",
+    "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+    "source": {
+      "repo": "jitendra-bhandari/Masala-CHAI",
+      "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+      "path": "Dataset/data_5/5.JPG",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/5.JPG",
+      "image_sha256": "ADEAD9B2D5B57E7FE78B912F552B8C6C34F99673A16170801FE847D02D5BC970"
+    },
+    "assets": {
+      "png": {
+        "file": "preview/parallel-current-divider.png",
+        "sha256": "0c271c02900367a322e4450c670e0f211da94c57a7e98bbd9a42d6871bcd2605"
+      },
+      "svg": {
+        "file": "preview/parallel-current-divider.svg",
+        "sha256": "63c73a50fada3a772324082aef39ec6f603c8f23caf500736c71cb4c41107a59"
+      }
+    }
+  },
+  {
+    "id": "parallel-series-rlc",
+    "mode": "guided",
+    "preview_run_id": "schematic-preview-efc8_x0_",
+    "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+    "source": {
+      "repo": "jitendra-bhandari/Masala-CHAI",
+      "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+      "path": "Dataset/data_5/222.JPG",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/222.JPG",
+      "image_sha256": "E6B1E0F1ACDE07B8CB02A5A122C9B4C7FFB4D26B6E1728E8E2C15A9F228FC48B"
+    },
+    "assets": {
+      "png": {
+        "file": "preview/parallel-series-rlc.png",
+        "sha256": "f4922f2f146b7c072b3773de8964d7983537d2b316fb985e33784bab786696b7"
+      },
+      "svg": {
+        "file": "preview/parallel-series-rlc.svg",
+        "sha256": "bcf50f977eb210aabdaa11595e7dca0bb44de4e0592c56533ca392dc7cdc03cb"
+      }
+    }
+  },
+  {
+    "id": "three-section-ladder",
+    "mode": "guided",
+    "preview_run_id": "schematic-preview-6j0l9qjr",
+    "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+    "source": {
+      "repo": "jitendra-bhandari/Masala-CHAI",
+      "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+      "path": "Dataset/data_5/7.JPG",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/7.JPG",
+      "image_sha256": "C82370DDF02C56CD1D7B8456392D90F1E099147AE9495E64D00E10BC1810FF2B"
+    },
+    "assets": {
+      "png": {
+        "file": "preview/three-section-ladder.png",
+        "sha256": "18adc11419eed86912785f6ed0f855cf01720ecad29afbde9ae4b257a5de432c"
+      },
+      "svg": {
+        "file": "preview/three-section-ladder.svg",
+        "sha256": "ce6278fb15f00c93ecd7016770e92339f0438d29250668e2da5ae9f95e0fd424"
+      }
+    }
+  }
+]

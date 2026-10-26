@@ -40,7 +40,7 @@ REQUIRED_TOOLS = {
     "fastmean_ac", "fastmean_transient", "fastmean_symbolic", "fastmean_inspect",
     "fastmean_list_examples", "fastmean_open", "fastmean_search_manual",
     "fastmean_relayout", "fastmean_preview", "fastmean_list_runs",
-    "fastmean_get_result", "fastmean_read_data", "fastmean_cancel",
+    "fastmean_get_result", "fastmean_read_data", "fastmean_cancel", "fastmean_plot",
 }
 NATIVE_ENABLED = os.environ.get("FASTMEAN_MCP_NATIVE_TEST", "").lower() in {"1", "true", "yes"}
 
@@ -314,7 +314,7 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
             async with self.session(output_dir) as client:
                 listed = await client.list_tools()
                 names = {tool.name for tool in listed.tools}
-                self.assertEqual(len(REQUIRED_TOOLS), 20)
+                self.assertEqual(len(REQUIRED_TOOLS), 21)
                 self.assertFalse(REQUIRED_TOOLS - names,
                                  f"Missing tools: {sorted(REQUIRED_TOOLS - names)}")
                 for tool in listed.tools:
@@ -342,6 +342,62 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                 await self.call_success(client, "fastmean_status")
                 after_error = await client.list_tools()
                 self.assertEqual({tool.name for tool in after_error.tools}, names)
+
+    async def test_saved_native_table_plot_images_resources_and_restart_through_stdio(self):
+        from tests.test_plotting import publish_numeric_fixture
+        with tempfile.TemporaryDirectory(prefix="fastmean-mcp-charts-") as temporary:
+            root = Path(temporary).resolve()
+            output = root / "runs"
+            source = publish_numeric_fixture(output, columns=["t", "U(IN)", "U(OUT)", "I(RL)", "I(VIN)", "U(OUT)*I(RL)"],
+                rows=[[0, 0, 0, 0, 0, 0], [1, 1, 4, 2, .001, 8], [3, -1, -4, -2, -.001, 8]])
+            source_job = output / source["run_id"]
+            before = filesystem_snapshot(source_job)
+            panels = [
+                {"signal": "U(IN)", "label": "Вход", "unit": "В"},
+                {"signal": "U(OUT)", "unit": "V", "metrics": ["rms", "mean"]},
+                {"signal": "I(RL)", "unit": "A"},
+                {"signal": "I(VIN)", "unit": "mA", "scale": 1000, "metrics": ["rms", "peak"]},
+                {"signal": "U(OUT)*I(RL)", "unit": "W", "metrics": ["mean"], "guides": ["mean"]},
+            ]
+            async with self.session(output, app_dir=root / "not-installed") as client:
+                response = await client.call_tool("fastmean_plot", {"run_id": source["run_id"], "panels": panels,
+                    "display_window": [1, 2.5], "measurement_window": [.5, 3], "x_unit": "ms",
+                    "title": "Saved native columns", "subtitle": "Offline protocol fixture"})
+                self.assertFalse(response.is_error, repr(payload(response)))
+                result = payload(response)
+                self.assertEqual(result["source_run_id"], source["run_id"])
+                self.assertEqual(result["analysis"], "plot")
+                self.assertEqual(len(result["measurements"]["signals"]), 5)
+                inline = [item for item in response.content if getattr(item, "type", None) == "image"]
+                self.assertEqual(len(inline), 1, "Chart tool must deliver actual MCP ImageContent")
+                png = base64.b64decode(inline[0].data, validate=True)
+                self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
+                artifacts = {entry["name"]: entry for entry in result["artifacts"]}
+                for name in ("plot.png", "plot.svg", "chart-spec.json", "measurements.json", "manifest.json"):
+                    self.assertIn(name, artifacts)
+                    data = resource_bytes(await client.read_resource(artifacts[name]["uri"]))
+                    self.assertTrue(data)
+                    if name == "plot.png":
+                        self.assertEqual(data, png)
+                    elif name == "plot.svg":
+                        self.assertIn("Вход", data.decode("utf-8"))
+                    elif name == "chart-spec.json":
+                        spec = json.loads(data)
+                        self.assertEqual(spec["display_window"], [1, 2.5])
+                        self.assertEqual(spec["measurement_window"], [.5, 3])
+                self.assertEqual(filesystem_snapshot(source_job), before, "Replot must preserve the native source run")
+                all_before = filesystem_snapshot(output)
+                for bad in ({"run_id": "../outside"}, {"run_id": source["run_id"], "display_window": [False, 1]},
+                            {"run_id": source["run_id"], "measurement_window": [0, 4]},
+                            {"run_id": source["run_id"], "panels": [{"signal": "U(NEW)*I(NEW)"}]}):
+                    rejected = await client.call_tool("fastmean_plot", bad)
+                    self.assertTrue(rejected.is_error, repr(payload(rejected)))
+                    self.assertEqual(filesystem_snapshot(output), all_before)
+            async with self.session(output, app_dir=root / "not-installed") as client:
+                reopened = await client.call_tool("fastmean_get_result", {"run_id": result["run_id"]})
+                self.assertFalse(reopened.is_error)
+                self.assertEqual(payload(reopened)["measurements"], result["measurements"])
+                self.assertTrue(any(getattr(item, "type", None) == "image" for item in reopened.content))
 
     async def test_offline_discovery_and_schema_rejections_do_not_write_results(self):
         with tempfile.TemporaryDirectory(prefix="fastmean-mcp-offline-") as temporary:

@@ -17,8 +17,8 @@ from typing import Any
 from .schematic import _load, _summarize, parse_value
 
 ORIGIN = "MCP schematic preview, not native screenshot"
-_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 1101, 6000, 6001, 6002, 7100}
-_COMPONENTS = {1000: "R", 1001: "C", 1002: "L", 2010: "U"}
+_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 7100}
+_COMPONENTS = {1000: "R", 1001: "C", 1002: "L", 2010: "U", 3010: "I"}
 _NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 7100}
 _DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
 _RENDER_LOCK = threading.Lock()
@@ -52,15 +52,16 @@ def _quantity(value: Any, unit: str) -> str:
 def _source_label(obj: dict) -> str:
     parameters = obj.get("Params") or {}
     mode = parameters.get("ST")
+    quantity,unit = ("I","A") if obj.get("Type")==3010 else ("U","V")
     if mode == 1:
-        return _quantity((parameters.get("DC") or {}).get("U0"), "V")
+        return _quantity((parameters.get("DC") or {}).get(quantity+"0"), unit)
     if mode == 2:
         ac = parameters.get("AC") or {}
-        return f"sine: {_quantity(ac.get('U0'), 'V')} / {_quantity(ac.get('F'), 'Hz')}"
+        return f"sine: {_quantity(ac.get(quantity+'0'), unit)} / {_quantity(ac.get('F'), 'Hz')}"
     if mode == 3:
         pulse = parameters.get("PULSE") or {}
-        return (f"pulse: {_quantity(pulse.get('UMIN'), 'V')} to "
-                f"{_quantity(pulse.get('UMAX'), 'V')} / {_quantity(pulse.get('F'), 'Hz')}")
+        return (f"pulse: {_quantity(pulse.get(quantity+'MIN'), unit)} to "
+                f"{_quantity(pulse.get(quantity+'MAX'), unit)} / {_quantity(pulse.get('F'), 'Hz')}")
     raise PreviewError(f"Unsupported voltage-source waveform mode {mode!r}; only DC, sine and pulse are rendered.")
 
 
@@ -111,7 +112,7 @@ def _model(source: Path) -> dict:
         if tid in {1000, 1001, 1002}:
             kind = _COMPONENTS[tid]
             values[oid] = _quantity((obj.get("Params") or {}).get(kind), {"R": "Ω", "C": "F", "L": "H"}[kind])
-        elif tid == 2010:
+        elif tid in {2010, 3010}:
             values[oid] = _source_label(obj)
         elif tid == 1101:
             params = obj.get("Params") or {}
@@ -166,7 +167,7 @@ def _draw_component(axis, obj, value):
         axis.plot(*zip(*points), color="#161b22", linewidth=width, zorder=4, solid_capstyle="round")
 
     tid = obj["Type"]
-    boundary = 23 if tid == 2010 else 22 if tid in {1000, 1002} else 4
+    boundary = 23 if tid in {2010,3010} else 22 if tid in {1000, 1002} else 4
     line([point(-40), point(-boundary)])
     line([point(boundary), point(40)])
     if tid == 1000:
@@ -183,20 +184,20 @@ def _draw_component(axis, obj, value):
             line(points)
     else:
         axis.add_patch(Circle((x, y), 23, facecolor="white", edgecolor="#161b22", linewidth=1.55, zorder=4))
-        for t, sign in ((-10, "−"), (10, "+")):
-            sx, sy = point(t)
-            axis.text(sx, sy, sign, ha="center", va="center", fontsize=11,
-                      fontweight="bold", color="#161b22", zorder=5, parse_math=False)
+        if tid == 3010:
+            axis.annotate("", xy=point(13), xytext=point(-13), arrowprops={"arrowstyle":"-|>","color":"#161b22","lw":1.55},zorder=5)
+        else:
+            for t, sign in ((-10, "−"), (10, "+")):
+                sx, sy = point(t)
+                axis.text(sx, sy, sign, ha="center", va="center", fontsize=11,
+                          fontweight="bold", color="#161b22", zorder=5, parse_math=False)
 
-    name = str(obj.get("Name", ""))
-    if uy:
-        lx, ly, align = x + 42, y - 12, "left"
-    else:
-        lx, ly, align = x, y - 51, "center"
-    axis.text(lx, ly, name, ha=align, va="center", fontsize=10, fontweight="bold",
-              color="#161b22", zorder=8, parse_math=False)
-    axis.text(lx, ly + 24, value, ha=align, va="center", fontsize=9,
-              color="#374151", zorder=8, parse_math=False)
+    from .captions import native_component_captions
+    for caption in native_component_captions(obj, value):
+        caption = dict(caption)
+        text = caption.pop("text")
+        axis.text(s=text, va="center", color="#161b22", zorder=8,
+                  parse_math=False, **caption)
 
 
 def _draw_native_component(axis, obj, value):
@@ -260,20 +261,31 @@ def _draw_native_component(axis, obj, value):
                 x, y = inset(pin, 15)
                 axis.text(x, y, str(pin), ha="center", va="center", fontsize=7,
                           color="#374151", zorder=8, parse_math=False)
-    axis.text((left+right)/2, top-40, str(obj.get("Name", "")), ha="center", va="center",
-              fontsize=10, fontweight="bold", color="#161b22", zorder=8, parse_math=False)
-    axis.text((left+right)/2, top-18, value, ha="center", va="center", fontsize=8,
-              color="#374151", zorder=8, parse_math=False)
+    if tid in {1101, 6000, 6001, 6002}:
+        from .captions import native_component_captions
+        for caption in native_component_captions(obj, value):
+            caption = dict(caption)
+            text = caption.pop("text")
+            axis.text(s=text, va="center", color="#161b22", zorder=8,
+                      parse_math=False, **caption)
+    else:
+        axis.text((left+right)/2, top-40, str(obj.get("Name", "")), ha="center", va="center",
+                  fontsize=10, fontweight="bold", color="#161b22", zorder=8, parse_math=False)
+        axis.text((left+right)/2, top-18, value, ha="center", va="center", fontsize=8,
+                  color="#374151", zorder=8, parse_math=False)
 
 
-def render_schematic(path: Path, output_dir: Path) -> dict:
+def render_schematic(path: Path, output_dir: Path, *, include_text: bool = True) -> dict:
     """Return fresh SVG/PNG previews reconstructed from native object IDs/pins.
 
-    Supports the wired layout's unflipped R/C/L/U symbols and explicit
+    Supports the wired layout's unflipped R/C/L/U/I symbols and explicit
     orthogonal wire segments. All validation precedes artifact creation.
     """
     model = _model(Path(path))
-    objects = model["objects"]
+    if not isinstance(include_text, bool):
+        raise PreviewError("include_text must be a boolean.")
+    omitted_text = sum(obj["Type"] == 900 for obj in model["objects"].values()) if not include_text else 0
+    objects = {oid: obj for oid, obj in model["objects"].items() if include_text or obj["Type"] != 900}
     xs = [obj["X"] for obj in objects.values()]
     ys = [obj["Y"] for obj in objects.values()]
     for obj in objects.values():
@@ -360,5 +372,6 @@ def render_schematic(path: Path, output_dir: Path) -> dict:
             "port_count": sum(o["Type"] == 400 for o in objects.values()), "wire_count": len(model["segments"]),
             "junction_count": sum(o["Type"] == 300 and model["degrees"][oid] >= 3 for oid, o in objects.items()),
             "routing_waypoint_count": sum(o["Type"] == 300 and model["degrees"][oid] == 2 for oid, o in objects.items()),
-            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U terminals ±40; native D/G/E/F/X geometry",
-            "approximate_wire_routes": False, "warnings": model["warnings"]}
+            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/X geometry",
+            "approximate_wire_routes": False, "text_objects_included": include_text,
+            "omitted_text_objects": omitted_text, "warnings": model["warnings"]}

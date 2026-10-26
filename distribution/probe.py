@@ -17,7 +17,7 @@ REQUIRED_TOOLS = {"fastmean_status", "fastmean_example", "fastmean_create_circui
                   "fastmean_create_project",
                   "fastmean_annotate_circuit",
                   "fastmean_export_netlist",
-                  "fastmean_ac", "fastmean_transient", "fastmean_symbolic", "fastmean_inspect"}
+                  "fastmean_ac", "fastmean_transient", "fastmean_plot", "fastmean_symbolic", "fastmean_inspect"}
 
 
 async def protocol(python: Path, app_dir: Path, output_dir: Path) -> dict:

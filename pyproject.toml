@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastmean-mcp-local"
-version = "1.1.0"
+version = "1.2.0"
 description = "Local stdio MCP adapter for FASTMEAN native circuit analysis"
 readme = "README.md"
 license = {file = "LICENSE"}

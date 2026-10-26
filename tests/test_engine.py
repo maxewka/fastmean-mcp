@@ -120,7 +120,7 @@ class EngineSafetyTests(unittest.TestCase):
         before = digest(self.source)
         engine = Engine(self.app, self.root / "jobs")
         job, manifest = engine._job(self.source, "ac")
-        private = yaml.safe_load((job / "circuit.scm").read_text())
+        private = yaml.safe_load((job / "circuit.scm").read_text(encoding="utf-8"))
         copied = private["scm"]["Scheme"]["Objects"]
         self.assertEqual(next(item for item in copied if item["Name"] == "R1")["Params"]["R"], 1000)
         self.assertEqual(copied[-2]["Params"]["Text"], "1к")

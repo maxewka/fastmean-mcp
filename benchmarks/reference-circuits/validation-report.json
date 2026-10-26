@@ -1,0 +1,1474 @@
+{
+  "schema_version": 1,
+  "completed_utc": "2026-10-26T20:30:42.799778+00:00",
+  "execution": "Official MCP SDK stdio: client.call_tool for every SCM construction, native netlist export and native calculation.",
+  "native_engine": {
+    "name": "FASTMEAN 6.1 native CLI",
+    "executable_sha256": "a001582ada87cdf013605f43b019957ae23204ef4bfcc33be02a0681b186ee25",
+    "mcp_server_version": "1.2.0"
+  },
+  "summary": {
+    "cases": 9,
+    "layout_variants": 18,
+    "primary_AC_passed": 18,
+    "primary_AC_required": 18,
+    "primary_AC_frequency_rows": 4618,
+    "secondary_AC_passed": 2,
+    "secondary_AC_frequency_rows": 802,
+    "exact_notch_checks_passed": 2,
+    "supported_transient_passed": 14,
+    "supported_transient_required": 14,
+    "final_run_extra_transient_timeouts": 2,
+    "diagnostic_DC_transient_timeouts_before_final_run": 2,
+    "RLC_transient_not_requested": 2,
+    "max_complex_AC_voltage_error_V": 1.668159214499232e-14,
+    "max_supported_transient_voltage_error_V": 4.994999169432874e-07,
+    "all_attempted_native_operations_passed": false
+  },
+  "oracle_provenance": "Independent complex nodal systems and closed-form step responses for declared fixture values. Native values come only from FASTMEAN CSV exports. Assigned fixture values are not original textbook outputs.",
+  "tolerances": {
+    "complex_voltage": "abs(error)<=1e-6 V+0.001*abs(expected voltage)",
+    "transient_voltage": "After source rise/first timestep: absolute voltage error <=0.001*max(1 V,abs(ideal output at requested stop time)).",
+    "notch_magnitude_absolute": 0.0001
+  },
+  "phase_exclusions": "Phase at the ideal RLC transfer zero is undefined and excluded. Its exact notch check requests magnitude only.",
+  "native_transient_limitation": {
+    "case": "compensated-rc-divider",
+    "known_limitation": "Observed native transient timeouts for the ideal voltage-source/capacitor loop; required numerical acceptance is AC-only.",
+    "future_preflight_note": "Skip this known timeout-prone transient topology unless explicitly testing native transient support. No native preflight rejection was exported.",
+    "observed": "Both layout modes timed out after 15 s with DC excitation and again with delayed 100 us / finite-rise 1 us pulse excitation. No numerical samples or transient/DC pass is claimed.",
+    "required_acceptance": "Primary and uncompensated secondary AC passed in both layouts."
+  },
+  "visual_review": {
+    "variants_reviewed": 18,
+    "general_quality": "Readable with real orthogonal wires; no observed collisions or accidental junctions.",
+    "guided_changes": "Aligned ports with escape rails; compensated divider has a straight balanced midpoint bus; RLC output rail is straight.",
+    "automatic_reference_arrangement_differences": [
+      "Battery divider upper resistor is horizontal rather than vertical.",
+      "Compensated divider uses a spine with upper/lower parallel branches rather than two vertical columns.",
+      "RLC capacitor is above its feed inductor instead of below.",
+      "Numbered ladder terminals use named tap ports and short marker leads.",
+      "Current-divider sole output is a right-facing upper-rail elbow above the source column, rather than a terminal beyond the far-right load; this remains a readable automatic layout choice."
+    ],
+    "glyph_differences": [
+      "Native rectangular resistors instead of textbook zigzags.",
+      "Circular ideal voltage sources instead of battery glyphs.",
+      "Analysis ground added where source image omits it."
+    ],
+    "scope": "Reference-guided fidelity and general automatic readability are distinct; no pixel-identical claim."
+  },
+  "gallery": [
+    {
+      "id": "compensated-rc-divider",
+      "mode": "guided",
+      "preview_run_id": "schematic-preview-4092jlkm",
+      "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/8.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/8.JPG",
+        "image_sha256": "D456FE1E84D75713703BAF65A64DFABA898FA734A2A4C4ED8F4BF04670FBD6B3"
+      },
+      "assets": {
+        "png": {
+          "file": "preview/compensated-rc-divider.png",
+          "sha256": "3f63e9a108bdfdd691616df1b315e8191b0e71da63308c68565c943f05bf416c"
+        },
+        "svg": {
+          "file": "preview/compensated-rc-divider.svg",
+          "sha256": "0e39b3c6728883715fcb9f082e487c4c12fda967284773d6e81181df08218c98"
+        }
+      }
+    },
+    {
+      "id": "parallel-current-divider",
+      "mode": "guided",
+      "preview_run_id": "schematic-preview-ht1jarz8",
+      "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/5.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/5.JPG",
+        "image_sha256": "ADEAD9B2D5B57E7FE78B912F552B8C6C34F99673A16170801FE847D02D5BC970"
+      },
+      "assets": {
+        "png": {
+          "file": "preview/parallel-current-divider.png",
+          "sha256": "0c271c02900367a322e4450c670e0f211da94c57a7e98bbd9a42d6871bcd2605"
+        },
+        "svg": {
+          "file": "preview/parallel-current-divider.svg",
+          "sha256": "63c73a50fada3a772324082aef39ec6f603c8f23caf500736c71cb4c41107a59"
+        }
+      }
+    },
+    {
+      "id": "parallel-series-rlc",
+      "mode": "guided",
+      "preview_run_id": "schematic-preview-efc8_x0_",
+      "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/222.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/222.JPG",
+        "image_sha256": "E6B1E0F1ACDE07B8CB02A5A122C9B4C7FFB4D26B6E1728E8E2C15A9F228FC48B"
+      },
+      "assets": {
+        "png": {
+          "file": "preview/parallel-series-rlc.png",
+          "sha256": "f4922f2f146b7c072b3773de8964d7983537d2b316fb985e33784bab786696b7"
+        },
+        "svg": {
+          "file": "preview/parallel-series-rlc.svg",
+          "sha256": "bcf50f977eb210aabdaa11595e7dca0bb44de4e0592c56533ca392dc7cdc03cb"
+        }
+      }
+    },
+    {
+      "id": "three-section-ladder",
+      "mode": "guided",
+      "preview_run_id": "schematic-preview-6j0l9qjr",
+      "origin": "Actual FASTMEAN MCP schematic preview; not a native application screenshot.",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/7.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/7.JPG",
+        "image_sha256": "C82370DDF02C56CD1D7B8456392D90F1E099147AE9495E64D00E10BC1810FF2B"
+      },
+      "assets": {
+        "png": {
+          "file": "preview/three-section-ladder.png",
+          "sha256": "18adc11419eed86912785f6ed0f855cf01720ecad29afbde9ae4b257a5de432c"
+        },
+        "svg": {
+          "file": "preview/three-section-ladder.svg",
+          "sha256": "ce6278fb15f00c93ecd7016770e92339f0438d29250668e2da5ae9f95e0fd424"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "battery-divider",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/6.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/6.JPG",
+        "image_sha256": "7D7C3C8EB299DD03156F782CA5FEE9B529B15897D613C5CA7B04C9DDE8169A5C"
+      },
+      "all_nominal_values_printed_in_reference": true,
+      "electrical_input_signature_sha256": "7509e8bd3dcc82143951f79e061b0e0b667786559283daf2e8050feaf516d999",
+      "native_schematic_sha256": "fb30e1b1eca02444cc4bfe982f2b00be798ffed63b03a7998cbc96702f52db09",
+      "native_create_run_id": "create-eij6_uuv",
+      "native_netlist_run_id": "20261026T202902_589210Z_315d6a6c6d47_netlist",
+      "native_ac_run_id": "20261026T202903_570272Z_87b597e05b4a_ac",
+      "native_ac_csv_sha256": "cdb51f342e5e3160cc257b8f0d4dc8b4a20a1e2ce9dc1e8029a34d1200a95298",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 0.0
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-sfedptcg",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 0.75,
+          "expected_V": 0.75
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 1.5,
+            "expected_V": 1.5,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.75,
+            "expected_V": 0.75,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 1.5,
+          "U(out)": 0.75
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T202905_299093Z_014e192e8acd_transient",
+      "native_transient_csv_sha256": "946f5bb9c408ea9de5d30026622def12631c7f7f8e5d32045ae0815dff03ce14"
+    },
+    {
+      "id": "battery-divider",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/6.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/6.JPG",
+        "image_sha256": "7D7C3C8EB299DD03156F782CA5FEE9B529B15897D613C5CA7B04C9DDE8169A5C"
+      },
+      "all_nominal_values_printed_in_reference": true,
+      "electrical_input_signature_sha256": "7509e8bd3dcc82143951f79e061b0e0b667786559283daf2e8050feaf516d999",
+      "native_schematic_sha256": "52a5299a1ee75516ead04278bef710e42183892763c418e414004f03458ce34c",
+      "native_create_run_id": "create-jhcul4e3",
+      "native_netlist_run_id": "20261026T202906_703487Z_082b204198e4_netlist",
+      "native_ac_run_id": "20261026T202907_651999Z_7d16aadc68af_ac",
+      "native_ac_csv_sha256": "cdb51f342e5e3160cc257b8f0d4dc8b4a20a1e2ce9dc1e8029a34d1200a95298",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 0.0
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-4125820b",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 0.75,
+          "expected_V": 0.75
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 1.5,
+            "expected_V": 1.5,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.75,
+            "expected_V": 0.75,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 1.5,
+          "U(out)": 0.75
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T202909_167195Z_52a0d4198545_transient",
+      "native_transient_csv_sha256": "946f5bb9c408ea9de5d30026622def12631c7f7f8e5d32045ae0815dff03ce14"
+    },
+    {
+      "id": "compensated-rc-divider",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/8.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/8.JPG",
+        "image_sha256": "D456FE1E84D75713703BAF65A64DFABA898FA734A2A4C4ED8F4BF04670FBD6B3"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "77c08ddbf3745e2047662b0112a2b4d5db019dc4f85bebe10790a41e88f81f84",
+      "native_schematic_sha256": "58608924a27aa937a130806fd359867879f0555812866828b11e58fd55170f09",
+      "native_create_run_id": "create-imw7oymj",
+      "native_netlist_run_id": "20261026T202910_501514Z_06911bc3c866_netlist",
+      "native_ac_run_id": "20261026T202911_436825Z_e64209b3798b_ac",
+      "native_ac_csv_sha256": "07a956eb67aa47091ddd37d98b8e234230ce3a2d078a847d5eaa443f41f02bef",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 2.798313307770383e-13,
+            "frequency_Hz": 14125.3754462277,
+            "absolute_error_V": 2.826296440848087e-17,
+            "observed": [
+              0.1,
+              -2.081668171172171e-17
+            ],
+            "expected": [
+              0.1,
+              7.446282696759159e-18
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-4092jlkm",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "ac_uncompensated": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 5.0839171874867635e-12,
+            "frequency_Hz": 78.0728440137909,
+            "absolute_error_V": 5.134803923769049e-16,
+            "observed": [
+              0.10000031186339253,
+              0.00035319295003587007
+            ],
+            "expected": [
+              0.10000031186339305,
+              0.0003531929500358716
+            ]
+          }
+        }
+      },
+      "ac_uncompensated_native_provenance": {
+        "run_id": "20261026T202913_147521Z_d5d3c3e3b649_ac",
+        "csv_sha256": "5d7846ee08e29f6961c0987f5fd2afc49984521e237b0dafded2d7205d78b20f"
+      },
+      "transient": {
+        "status": "timeout",
+        "timeout_seconds": 15,
+        "source_preparation": {
+          "kind": "pulse",
+          "frequency": 1,
+          "high": 1,
+          "low": 0,
+          "duty_percent": 50,
+          "delay": 0.0001,
+          "rise_time": 1e-06
+        },
+        "acceptance": "AC-only; no native transient or native DC pass is claimed.",
+        "limitation": "Known native TD limitation for this ideal voltage-source/capacitor loop: DC and delayed finite-rise pulse attempts timed out; topology is preserved. No native preflight rejection was exported."
+      }
+    },
+    {
+      "id": "compensated-rc-divider",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/8.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/8.JPG",
+        "image_sha256": "D456FE1E84D75713703BAF65A64DFABA898FA734A2A4C4ED8F4BF04670FBD6B3"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "77c08ddbf3745e2047662b0112a2b4d5db019dc4f85bebe10790a41e88f81f84",
+      "native_schematic_sha256": "f53098c7725597a00dc01a5e72d708360a0a11b6734a7384613b61494b168dfb",
+      "native_create_run_id": "create-liin06mp",
+      "native_netlist_run_id": "20261026T202930_159040Z_a0b8e2b4c564_netlist",
+      "native_ac_run_id": "20261026T202931_118889Z_ff582189f813_ac",
+      "native_ac_csv_sha256": "07a956eb67aa47091ddd37d98b8e234230ce3a2d078a847d5eaa443f41f02bef",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 2.798313307770383e-13,
+            "frequency_Hz": 14125.3754462277,
+            "absolute_error_V": 2.826296440848087e-17,
+            "observed": [
+              0.1,
+              -2.081668171172171e-17
+            ],
+            "expected": [
+              0.1,
+              7.446282696759159e-18
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-0va8wmmz",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "ac_uncompensated": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 5.0839171874867635e-12,
+            "frequency_Hz": 78.0728440137909,
+            "absolute_error_V": 5.134803923769049e-16,
+            "observed": [
+              0.10000031186339253,
+              0.00035319295003587007
+            ],
+            "expected": [
+              0.10000031186339305,
+              0.0003531929500358716
+            ]
+          }
+        }
+      },
+      "ac_uncompensated_native_provenance": {
+        "run_id": "20261026T202932_731997Z_97193cb8e2a8_ac",
+        "csv_sha256": "5d7846ee08e29f6961c0987f5fd2afc49984521e237b0dafded2d7205d78b20f"
+      },
+      "transient": {
+        "status": "timeout",
+        "timeout_seconds": 15,
+        "source_preparation": {
+          "kind": "pulse",
+          "frequency": 1,
+          "high": 1,
+          "low": 0,
+          "duty_percent": 50,
+          "delay": 0.0001,
+          "rise_time": 1e-06
+        },
+        "acceptance": "AC-only; no native transient or native DC pass is claimed.",
+        "limitation": "Known native TD limitation for this ideal voltage-source/capacitor loop: DC and delayed finite-rise pulse attempts timed out; topology is preserved. No native preflight rejection was exported."
+      }
+    },
+    {
+      "id": "norton-divider",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/2.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/2.JPG",
+        "image_sha256": "956F21118986B091F7A1D3083B046513A09D9B4B89165B986A557CEEF2C10024"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "b5c77de573c38e6bb2e8948feb42ec7f82a8b8c949e1125b3f57f8667a5e2157",
+      "native_schematic_sha256": "360e9e07861679977a70b160532d0f3f1506d568ef8e4a4b14bf79b15c76de6d",
+      "native_create_run_id": "create-o_9ommdj",
+      "native_netlist_run_id": "20261026T202949_642367Z_661aa5df201c_netlist",
+      "native_ac_run_id": "20261026T202950_658173Z_161cf0f71cd4_ac",
+      "native_ac_csv_sha256": "2ef84b5bcdb325fe40b24821df40b38f399fc4d496886445c5e2eead63328156",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "out": {
+            "scaled_error": 1.848831015195931e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              1.2,
+              0.0
+            ],
+            "expected": [
+              1.2000000000000002,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-cza614as",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 1.2,
+          "expected_V": 1.2
+        },
+        "final_dc": {
+          "out": {
+            "observed_V": 1.2,
+            "expected_V": 1.2,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(out)": 1.2
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T202951_963038Z_9d9b1f5978b2_transient",
+      "native_transient_csv_sha256": "209813a957ef173aee6ffe1de03061f45b4b125ab10d0a7e7b320c67f57285fc"
+    },
+    {
+      "id": "norton-divider",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/2.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/2.JPG",
+        "image_sha256": "956F21118986B091F7A1D3083B046513A09D9B4B89165B986A557CEEF2C10024"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "b5c77de573c38e6bb2e8948feb42ec7f82a8b8c949e1125b3f57f8667a5e2157",
+      "native_schematic_sha256": "2937716292d198f966f6b2d49623f6d9f91a7d697fd8cb82a5760531369531bc",
+      "native_create_run_id": "create-cpx0mpfu",
+      "native_netlist_run_id": "20261026T202953_223620Z_11d596954bb3_netlist",
+      "native_ac_run_id": "20261026T202954_140744Z_9fdda23509bb_ac",
+      "native_ac_csv_sha256": "2ef84b5bcdb325fe40b24821df40b38f399fc4d496886445c5e2eead63328156",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "out": {
+            "scaled_error": 1.848831015195931e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              1.2,
+              0.0
+            ],
+            "expected": [
+              1.2000000000000002,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-879ayscq",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 1.2,
+          "expected_V": 1.2
+        },
+        "final_dc": {
+          "out": {
+            "observed_V": 1.2,
+            "expected_V": 1.2,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(out)": 1.2
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T202955_415851Z_c870a9849e7e_transient",
+      "native_transient_csv_sha256": "209813a957ef173aee6ffe1de03061f45b4b125ab10d0a7e7b320c67f57285fc"
+    },
+    {
+      "id": "parallel-current-divider",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/5.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/5.JPG",
+        "image_sha256": "ADEAD9B2D5B57E7FE78B912F552B8C6C34F99673A16170801FE847D02D5BC970"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "9fc33a0902e4e3d7de61a462de48b16308db8ec59cfe289463739832dff37716",
+      "native_schematic_sha256": "9033d65e6e205f52c8fc04ba3df023312143c4a7239ff95a36656a1d5689ac66",
+      "native_create_run_id": "create-fishquud",
+      "native_netlist_run_id": "20261026T202956_686752Z_2f6a2143b221_netlist",
+      "native_ac_run_id": "20261026T202957_626092Z_251f95db8b62_ac",
+      "native_ac_csv_sha256": "2ef84b5bcdb325fe40b24821df40b38f399fc4d496886445c5e2eead63328156",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "out": {
+            "scaled_error": 1.848831015195931e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              1.2,
+              0.0
+            ],
+            "expected": [
+              1.2000000000000002,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-ht1jarz8",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 1.2,
+          "expected_V": 1.2
+        },
+        "final_dc": {
+          "out": {
+            "observed_V": 1.2,
+            "expected_V": 1.2,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(out)": 1.2
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T202959_011441Z_163ceb26ab69_transient",
+      "native_transient_csv_sha256": "209813a957ef173aee6ffe1de03061f45b4b125ab10d0a7e7b320c67f57285fc"
+    },
+    {
+      "id": "parallel-current-divider",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/5.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/5.JPG",
+        "image_sha256": "ADEAD9B2D5B57E7FE78B912F552B8C6C34F99673A16170801FE847D02D5BC970"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "9fc33a0902e4e3d7de61a462de48b16308db8ec59cfe289463739832dff37716",
+      "native_schematic_sha256": "b3abeb50142c290a3d6a029f85fa9c69c7da1056beccea19e2498a64d9f0f062",
+      "native_create_run_id": "create-q6n6_p06",
+      "native_netlist_run_id": "20261026T203000_307016Z_13ba77a0c911_netlist",
+      "native_ac_run_id": "20261026T203001_217862Z_763fd9f6b71d_ac",
+      "native_ac_csv_sha256": "2ef84b5bcdb325fe40b24821df40b38f399fc4d496886445c5e2eead63328156",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "out": {
+            "scaled_error": 1.848831015195931e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              1.2,
+              0.0
+            ],
+            "expected": [
+              1.2000000000000002,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-gf_77vgf",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 1.2,
+          "expected_V": 1.2
+        },
+        "final_dc": {
+          "out": {
+            "observed_V": 1.2,
+            "expected_V": 1.2,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(out)": 1.2
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203002_488060Z_817644e2b48d_transient",
+      "native_transient_csv_sha256": "209813a957ef173aee6ffe1de03061f45b4b125ab10d0a7e7b320c67f57285fc"
+    },
+    {
+      "id": "parallel-series-rlc",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/222.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/222.JPG",
+        "image_sha256": "E6B1E0F1ACDE07B8CB02A5A122C9B4C7FFB4D26B6E1728E8E2C15A9F228FC48B"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "45503e32be77e021c72ccc242ad12911a9ea6223792fcf3eb9a0316f152695c5",
+      "native_schematic_sha256": "5cb26343afe075e1f436649e08aa1b0fbc659d3d9112c2ace46e65a1194ba4fe",
+      "native_create_run_id": "create-94na3up9",
+      "native_netlist_run_id": "20261026T203003_798220Z_befa795ffcc8_netlist",
+      "native_ac_run_id": "20261026T203004_739754Z_56392d443854_ac",
+      "native_ac_csv_sha256": "37fed02e37ba2f82d7eeee9ed2402af6ff382bb31f86254d288e807812c7a9d8",
+      "ac": {
+        "passed": true,
+        "samples": 601,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 7.252325388734253e-11,
+            "frequency_Hz": 5011.87233627279,
+            "absolute_error_V": 1.0848462574707776e-15,
+            "observed": [
+              0.011866271397426367,
+              -0.007350787927720162
+            ],
+            "expected": [
+              0.011866271397427299,
+              -0.007350787927720718
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-efc8_x0_",
+      "preview_geometry_refreshed_after_native_run": true,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "notch": {
+        "passed": true,
+        "frequency_Hz": 5032.9212104487,
+        "native_magnitude": 2.318121752821e-16,
+        "analytical_notch_Hz": 5032.921210448703
+      },
+      "notch_native_provenance": {
+        "run_id": "20261026T203006_275907Z_e2f2fb5f5372_ac",
+        "csv_sha256": "43238021df807b30687829ac224d6c4b3f132a3663ba2a42fab90d136f336b01"
+      },
+      "transient": {
+        "status": "not_requested",
+        "reason": "No finite steady DC current through the ideal inductor/source path; positive-frequency AC is the benchmark."
+      }
+    },
+    {
+      "id": "parallel-series-rlc",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/222.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/222.JPG",
+        "image_sha256": "E6B1E0F1ACDE07B8CB02A5A122C9B4C7FFB4D26B6E1728E8E2C15A9F228FC48B"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "45503e32be77e021c72ccc242ad12911a9ea6223792fcf3eb9a0316f152695c5",
+      "native_schematic_sha256": "2cc55b6b1c634cecc4ec83ca837a8ff56942bb35a1ce98da55b3d58d91454427",
+      "native_create_run_id": "create-t9br_8st",
+      "native_netlist_run_id": "20261026T203007_594220Z_85cc075f42a7_netlist",
+      "native_ac_run_id": "20261026T203008_534524Z_d0879b5f42b7_ac",
+      "native_ac_csv_sha256": "37fed02e37ba2f82d7eeee9ed2402af6ff382bb31f86254d288e807812c7a9d8",
+      "ac": {
+        "passed": true,
+        "samples": 601,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 7.252325388734253e-11,
+            "frequency_Hz": 5011.87233627279,
+            "absolute_error_V": 1.0848462574707776e-15,
+            "observed": [
+              0.011866271397426367,
+              -0.007350787927720162
+            ],
+            "expected": [
+              0.011866271397427299,
+              -0.007350787927720718
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-j4se5kl6",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "notch": {
+        "passed": true,
+        "frequency_Hz": 5032.9212104487,
+        "native_magnitude": 2.318121752821e-16,
+        "analytical_notch_Hz": 5032.921210448703
+      },
+      "notch_native_provenance": {
+        "run_id": "20261026T203010_089498Z_94642bd8a1db_ac",
+        "csv_sha256": "43238021df807b30687829ac224d6c4b3f132a3663ba2a42fab90d136f336b01"
+      },
+      "transient": {
+        "status": "not_requested",
+        "reason": "No finite steady DC current through the ideal inductor/source path; positive-frequency AC is the benchmark."
+      }
+    },
+    {
+      "id": "rc-coupling-highpass",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/4.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/4.JPG",
+        "image_sha256": "842AC99AE842BE7C46E02A7AC4F595B77F56DE50F3D23D4015CB15272DB714DD"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "a93ece52d29fe694f0adf3224c755a461d39524fb005175a233b0da47fb224ce",
+      "native_schematic_sha256": "36e90065bca20e8794e8802fb45f251ef023f17e5e91bc2a165341592fbe4544",
+      "native_create_run_id": "create-phc_ao4m",
+      "native_netlist_run_id": "20261026T203011_337753Z_343672acc413_netlist",
+      "native_ac_run_id": "20261026T203012_269940Z_b111e9719bc7_ac",
+      "native_ac_csv_sha256": "74364587d2ffb1e5e192d3ba840b37926a33c1183dbf8422349da481f575abc4",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 1.851455410545312e-11,
+            "frequency_Hz": 10000.0000000002,
+            "absolute_error_V": 1.668159214499232e-14,
+            "observed": [
+              0.8999977202791432,
+              0.0014323908595491952
+            ],
+            "expected": [
+              0.8999977202791427,
+              0.0014323908595325196
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-qja9xgzm",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 5004,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 4.495501992884954e-08,
+          "observed_V": 0.899100404895017,
+          "expected_V": 0.899100359939997
+        },
+        "final_dc": {},
+        "last": {
+          "t": 0.05,
+          "U(in)": 1.0,
+          "U(out)": 0.00606415260238802
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203013_840752Z_15f634d905f9_transient",
+      "native_transient_csv_sha256": "91adb00080c49000e4923a5123d8a6ad2483e90a335ee9dbb5e0c861ff673370"
+    },
+    {
+      "id": "rc-coupling-highpass",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/4.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/4.JPG",
+        "image_sha256": "842AC99AE842BE7C46E02A7AC4F595B77F56DE50F3D23D4015CB15272DB714DD"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "a93ece52d29fe694f0adf3224c755a461d39524fb005175a233b0da47fb224ce",
+      "native_schematic_sha256": "7d7a3097d4fdeb1dd0b236e0fe467fbd86a0ddebde76d2622470ceb7b6b4fc21",
+      "native_create_run_id": "create-5y274l7q",
+      "native_netlist_run_id": "20261026T203015_222594Z_47bd66a65778_netlist",
+      "native_ac_run_id": "20261026T203016_154829Z_c3939ce6e0bc_ac",
+      "native_ac_csv_sha256": "74364587d2ffb1e5e192d3ba840b37926a33c1183dbf8422349da481f575abc4",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 1.851455410545312e-11,
+            "frequency_Hz": 10000.0000000002,
+            "absolute_error_V": 1.668159214499232e-14,
+            "observed": [
+              0.8999977202791432,
+              0.0014323908595491952
+            ],
+            "expected": [
+              0.8999977202791427,
+              0.0014323908595325196
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-e4dsmegu",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 5004,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 4.495501992884954e-08,
+          "observed_V": 0.899100404895017,
+          "expected_V": 0.899100359939997
+        },
+        "final_dc": {},
+        "last": {
+          "t": 0.05,
+          "U(in)": 1.0,
+          "U(out)": 0.00606415260238802
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203017_784593Z_c2f37e572936_transient",
+      "native_transient_csv_sha256": "91adb00080c49000e4923a5123d8a6ad2483e90a335ee9dbb5e0c861ff673370"
+    },
+    {
+      "id": "rc-lowpass",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/3.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/3.JPG",
+        "image_sha256": "884BBD6A74249B460669D4B0A2F62B82CD7D783B6300C38137D6CDCCB30C5997"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "17f983be20975e18bb2e9448d531d38d2a2780de0f86a711498c199ea46fa4f9",
+      "native_schematic_sha256": "c54221a70953fa40c1472249b809a5f2b60c06489e8bdcd58835c29a50542460",
+      "native_create_run_id": "create-0qnqr_8w",
+      "native_netlist_run_id": "20261026T203019_173971Z_51bf95962bb0_netlist",
+      "native_ac_run_id": "20261026T203020_089805Z_a7a6210ea8d3_ac",
+      "native_ac_csv_sha256": "eee58108d174e87df4f9eb6f99ba0d3109c501bcd705a9af02a79448e9845ffa",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 6.1647181560946136e-12,
+            "frequency_Hz": 1496.23565609445,
+            "absolute_error_V": 6.582287021846978e-16,
+            "observed": [
+              0.011188039072272012,
+              -0.10518016378571235
+            ],
+            "expected": [
+              0.0111880390722721,
+              -0.105180163785713
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-o94uzgaq",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 5004,
+        "worst": {
+          "t_s": 1.001e-06,
+          "absolute_error_V": 4.994999169432874e-07,
+          "observed_V": 0.000999999666708425,
+          "expected_V": 0.0010004991666253682
+        },
+        "final_dc": {},
+        "last": {
+          "t": 0.005,
+          "U(in)": 1.0,
+          "U(out)": 0.993262049631938
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203021_606394Z_ff3718fee952_transient",
+      "native_transient_csv_sha256": "05bbc5c59bab81ecd642b9f3cb6b64f608bbba5baea4e46838ce02bfe84da17a"
+    },
+    {
+      "id": "rc-lowpass",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/3.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/3.JPG",
+        "image_sha256": "884BBD6A74249B460669D4B0A2F62B82CD7D783B6300C38137D6CDCCB30C5997"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "17f983be20975e18bb2e9448d531d38d2a2780de0f86a711498c199ea46fa4f9",
+      "native_schematic_sha256": "726831ba95c74ff38e72c57f3df835a3013be51c20398c208146000d6aedc60c",
+      "native_create_run_id": "create-pdpf457f",
+      "native_netlist_run_id": "20261026T203023_014107Z_95ab3875d8a2_netlist",
+      "native_ac_run_id": "20261026T203023_936604Z_94ae42ae5794_ac",
+      "native_ac_csv_sha256": "eee58108d174e87df4f9eb6f99ba0d3109c501bcd705a9af02a79448e9845ffa",
+      "ac": {
+        "passed": true,
+        "samples": 401,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 6.1647181560946136e-12,
+            "frequency_Hz": 1496.23565609445,
+            "absolute_error_V": 6.582287021846978e-16,
+            "observed": [
+              0.011188039072272012,
+              -0.10518016378571235
+            ],
+            "expected": [
+              0.0111880390722721,
+              -0.105180163785713
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-tlspm3gn",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 5004,
+        "worst": {
+          "t_s": 1.001e-06,
+          "absolute_error_V": 4.994999169432874e-07,
+          "observed_V": 0.000999999666708425,
+          "expected_V": 0.0010004991666253682
+        },
+        "final_dc": {},
+        "last": {
+          "t": 0.005,
+          "U(in)": 1.0,
+          "U(out)": 0.993262049631938
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203025_490093Z_76a8db010a23_transient",
+      "native_transient_csv_sha256": "05bbc5c59bab81ecd642b9f3cb6b64f608bbba5baea4e46838ce02bfe84da17a"
+    },
+    {
+      "id": "thevenin-divider",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/1.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/1.JPG",
+        "image_sha256": "23634FA31208352B452B04F35F0393D5F8DF87D098DD81E208F114091A96EE0E"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "fa36165cc77c86c2ae3c667eaebf1501c9e2e5d18b740a721d4c6783f6dd3e52",
+      "native_schematic_sha256": "b7a1a958f2a75e8d2e34595df69047fce7de3c5615486f2d85f646f21b664fd6",
+      "native_create_run_id": "create-9id4nkgu",
+      "native_netlist_run_id": "20261026T203026_838058Z_98ea66521252_netlist",
+      "native_ac_run_id": "20261026T203027_752034Z_415b37807e98_ac",
+      "native_ac_csv_sha256": "7d46630d60a1ee29c1acb82719b47cdb5b356a21e4893e17e63a9aabaeb1b4ac",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 0.0
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-ogcjone1",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 0.9,
+          "expected_V": 0.9
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 1.0,
+            "expected_V": 1,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.9,
+            "expected_V": 0.9,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 1.0,
+          "U(out)": 0.9
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203029_144491Z_fd0f6a532ea8_transient",
+      "native_transient_csv_sha256": "c9ecd11bcff58b476732a603c91995536c38d2baa32e2bbc5fac825e6792d7e7"
+    },
+    {
+      "id": "thevenin-divider",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/1.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/1.JPG",
+        "image_sha256": "23634FA31208352B452B04F35F0393D5F8DF87D098DD81E208F114091A96EE0E"
+      },
+      "all_nominal_values_printed_in_reference": false,
+      "electrical_input_signature_sha256": "fa36165cc77c86c2ae3c667eaebf1501c9e2e5d18b740a721d4c6783f6dd3e52",
+      "native_schematic_sha256": "6f489fd9c6bb081e79300589dc3381cbe01e13830d7b45c2a173467c4dd6a13f",
+      "native_create_run_id": "create-e8ofadkw",
+      "native_netlist_run_id": "20261026T203030_542282Z_0c6149b86d31_netlist",
+      "native_ac_run_id": "20261026T203031_473403Z_7f6bc7ba9d41_ac",
+      "native_ac_csv_sha256": "7d46630d60a1ee29c1acb82719b47cdb5b356a21e4893e17e63a9aabaeb1b4ac",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "out": {
+            "scaled_error": 0.0
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-qad1g456",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 0.0,
+          "observed_V": 0.9,
+          "expected_V": 0.9
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 1.0,
+            "expected_V": 1,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.9,
+            "expected_V": 0.9,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 1.0,
+          "U(out)": 0.9
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203032_906976Z_7dcf0ca70c33_transient",
+      "native_transient_csv_sha256": "c9ecd11bcff58b476732a603c91995536c38d2baa32e2bbc5fac825e6792d7e7"
+    },
+    {
+      "id": "three-section-ladder",
+      "mode": "guided",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/7.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/7.JPG",
+        "image_sha256": "C82370DDF02C56CD1D7B8456392D90F1E099147AE9495E64D00E10BC1810FF2B"
+      },
+      "all_nominal_values_printed_in_reference": true,
+      "electrical_input_signature_sha256": "c193fd548ec235fa38893c654ad1368ea70e9dd8c710d23868dfd29cd0b6bb61",
+      "native_schematic_sha256": "eee759e004060c7dd0ca8191d962b06848af252d3d62e4b05072b09c2490b6c7",
+      "native_create_run_id": "create-47zf8i7l",
+      "native_netlist_run_id": "20261026T203034_290459Z_6f2b4986a023_netlist",
+      "native_ac_run_id": "20261026T203035_234115Z_35fb9d6c0690_ac",
+      "native_ac_csv_sha256": "1eeefe6475f2247a2eff72ccb3d0519cee2c148128331ab95da3048bb3d955b2",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "tap2": {
+            "scaled_error": 1.0388986374034216e-12,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 3.9968028886505635e-15,
+            "observed": [
+              3.84615384615385,
+              0.0
+            ],
+            "expected": [
+              3.846153846153846,
+              0.0
+            ]
+          },
+          "tap3": {
+            "scaled_error": 1.0096466820655497e-12,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 1.5543122344752192e-15,
+            "observed": [
+              1.53846153846154,
+              0.0
+            ],
+            "expected": [
+              1.5384615384615385,
+              0.0
+            ]
+          },
+          "out": {
+            "scaled_error": 2.8828321821885614e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              0.769230769230769,
+              0.0
+            ],
+            "expected": [
+              0.7692307692307693,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-6j0l9qjr",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 2.220446049250313e-16,
+          "observed_V": 0.769230769230769,
+          "expected_V": 0.7692307692307693
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 10.0,
+            "expected_V": 10,
+            "passed": true
+          },
+          "tap2": {
+            "observed_V": 3.84615384615385,
+            "expected_V": 3.8461538461538463,
+            "passed": true
+          },
+          "tap3": {
+            "observed_V": 1.53846153846154,
+            "expected_V": 1.5384615384615385,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.769230769230769,
+            "expected_V": 0.7692307692307693,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 10.0,
+          "U(tap2)": 3.84615384615385,
+          "U(tap3)": 1.53846153846154,
+          "U(out)": 0.769230769230769
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203037_058501Z_4f78bdb33910_transient",
+      "native_transient_csv_sha256": "6a4db0785f1c2597ed0afb88e8b18e400d4bfd525999c54b4c0dc7dd89e8a419"
+    },
+    {
+      "id": "three-section-ladder",
+      "mode": "automatic",
+      "source": {
+        "repo": "jitendra-bhandari/Masala-CHAI",
+        "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+        "path": "Dataset/data_5/7.JPG",
+        "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/7.JPG",
+        "image_sha256": "C82370DDF02C56CD1D7B8456392D90F1E099147AE9495E64D00E10BC1810FF2B"
+      },
+      "all_nominal_values_printed_in_reference": true,
+      "electrical_input_signature_sha256": "c193fd548ec235fa38893c654ad1368ea70e9dd8c710d23868dfd29cd0b6bb61",
+      "native_schematic_sha256": "0cef368d99a76d69f067f719effd6edbc961e714eba66b7cf52f5addd39dfd57",
+      "native_create_run_id": "create-lcofc3g3",
+      "native_netlist_run_id": "20261026T203038_543719Z_be819bd3cf41_netlist",
+      "native_ac_run_id": "20261026T203039_488705Z_fd0930893fd5_ac",
+      "native_ac_csv_sha256": "1eeefe6475f2247a2eff72ccb3d0519cee2c148128331ab95da3048bb3d955b2",
+      "ac": {
+        "passed": true,
+        "samples": 101,
+        "failed_cells": 0,
+        "comparison": "Complex node voltage: abs(error) <= 1e-6 V + 0.1% expected magnitude",
+        "worst": {
+          "in": {
+            "scaled_error": 0.0
+          },
+          "tap2": {
+            "scaled_error": 1.0388986374034216e-12,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 3.9968028886505635e-15,
+            "observed": [
+              3.84615384615385,
+              0.0
+            ],
+            "expected": [
+              3.846153846153846,
+              0.0
+            ]
+          },
+          "tap3": {
+            "scaled_error": 1.0096466820655497e-12,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 1.5543122344752192e-15,
+            "observed": [
+              1.53846153846154,
+              0.0
+            ],
+            "expected": [
+              1.5384615384615385,
+              0.0
+            ]
+          },
+          "out": {
+            "scaled_error": 2.8828321821885614e-13,
+            "frequency_Hz": 10.0,
+            "absolute_error_V": 2.220446049250313e-16,
+            "observed": [
+              0.769230769230769,
+              0.0
+            ],
+            "expected": [
+              0.7692307692307693,
+              0.0
+            ]
+          }
+        }
+      },
+      "preview_run_id": "schematic-preview-1h0dmbqz",
+      "preview_geometry_refreshed_after_native_run": false,
+      "preview_refresh_policy": "MCP create/inspect/preview only. Identical components, ports and analysis signature; only placement/port geometry changed.",
+      "preview_visual_review": "Readable; no observed component/label collisions, diagonal routing or accidental junctions.",
+      "transient": {
+        "passed": true,
+        "samples": 204,
+        "worst": {
+          "t_s": 1.0001e-05,
+          "absolute_error_V": 2.220446049250313e-16,
+          "observed_V": 0.769230769230769,
+          "expected_V": 0.7692307692307693
+        },
+        "final_dc": {
+          "in": {
+            "observed_V": 10.0,
+            "expected_V": 10,
+            "passed": true
+          },
+          "tap2": {
+            "observed_V": 3.84615384615385,
+            "expected_V": 3.8461538461538463,
+            "passed": true
+          },
+          "tap3": {
+            "observed_V": 1.53846153846154,
+            "expected_V": 1.5384615384615385,
+            "passed": true
+          },
+          "out": {
+            "observed_V": 0.769230769230769,
+            "expected_V": 0.7692307692307693,
+            "passed": true
+          }
+        },
+        "last": {
+          "t": 0.002,
+          "U(in)": 10.0,
+          "U(tap2)": 3.84615384615385,
+          "U(tap3)": 1.53846153846154,
+          "U(out)": 0.769230769230769
+        },
+        "comparison": "After source rise/first timestep: <=0.1% full-scale voltage"
+      },
+      "native_transient_run_id": "20261026T203041_277937Z_e2f9eaf13b99_transient",
+      "native_transient_csv_sha256": "6a4db0785f1c2597ed0afb88e8b18e400d4bfd525999c54b4c0dc7dd89e8a419"
+    }
+  ]
+}

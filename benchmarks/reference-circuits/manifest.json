@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "title": "External reference circuit benchmark",
+  "source_repository": "jitendra-bhandari/Masala-CHAI",
+  "source_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+  "case_count": 9,
+  "content": "Original machine-readable transcriptions, independent analytical expectations, own MCP preview gallery and sanitized native numerical validation report; no original source images or raw private logs.",
+  "source_image_rights": "Unestablished; source images are not redistributed.",
+  "layout_modes": {
+    "reference_guided": "case.circuit_spec: 20-unit component placements and external port positions; no mandatory node anchors or explicit routes.",
+    "automatic": "case.automatic_circuit_spec: identical components, ports and analysis; compact density and rail/local ground style only."
+  },
+  "polarity_contract": {
+    "U": "nodes=[positive,negative]",
+    "I": "nodes=[from,to], positive current first→second; native current export signs are checked separately.",
+    "passive_current_oracles": "Physical from/to nodes, without assuming native exported current signs."
+  },
+  "execution_policy": "Every SCM construction and native calculation used the official MCP SDK stdio client. No UI automation. See validation-report.json for passed checks and disclosed native transient timeouts.",
+  "visual_policy": "Topology, numerical agreement, reference-guided fidelity and automatic visual quality are separate gates. Hand placements alone do not establish generator consistency.",
+  "tolerances": {
+    "ac_complex_node_voltage": {
+      "absolute_floor_V": 1e-06,
+      "relative": 0.001,
+      "rule": "abs(observed-expected)<=1e-6 V+0.001*abs(expected)"
+    },
+    "final_dc_node_voltage": {
+      "absolute_floor_V": 1e-06,
+      "relative": 0.001,
+      "scope": "Final native voltage samples for supported DC-copy fixtures; not a separate native DC solver call."
+    },
+    "transient_output_voltage": {
+      "fraction_of_scale": 0.001,
+      "scale": "max(1 V,abs(ideal output at requested stop time))",
+      "exclude": "Source rise interval and first timestep"
+    },
+    "notch_magnitude": {
+      "absolute_max": 0.0001,
+      "phase": "Excluded at ideal transfer zero"
+    },
+    "not_separately_measured": [
+      "Physical current values/directions in case metadata are analytical expectations; this harness does not assert current export columns.",
+      "Standalone phase examples are analytical expectations; AC acceptance reconstructs complex voltage from native magnitude/phase."
+    ],
+    "status": "These are the actual applied harness rules; no standalone current or phase tolerance is claimed."
+  },
+  "cases": [
+    {
+      "id": "thevenin-divider",
+      "file": "cases/thevenin-divider.json",
+      "source_path": "Dataset/data_5/1.JPG",
+      "required_kinds": [
+        "R",
+        "U"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "norton-divider",
+      "file": "cases/norton-divider.json",
+      "source_path": "Dataset/data_5/2.JPG",
+      "required_kinds": [
+        "R",
+        "I"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "rc-lowpass",
+      "file": "cases/rc-lowpass.json",
+      "source_path": "Dataset/data_5/3.JPG",
+      "required_kinds": [
+        "R",
+        "C",
+        "U"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "rc-coupling-highpass",
+      "file": "cases/rc-coupling-highpass.json",
+      "source_path": "Dataset/data_5/4.JPG",
+      "required_kinds": [
+        "R",
+        "C",
+        "U"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "parallel-current-divider",
+      "file": "cases/parallel-current-divider.json",
+      "source_path": "Dataset/data_5/5.JPG",
+      "required_kinds": [
+        "R",
+        "I"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "battery-divider",
+      "file": "cases/battery-divider.json",
+      "source_path": "Dataset/data_5/6.JPG",
+      "required_kinds": [
+        "R",
+        "U"
+      ],
+      "required_feature_gaps": [
+        "battery_glyph"
+      ],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": true
+    },
+    {
+      "id": "three-section-ladder",
+      "file": "cases/three-section-ladder.json",
+      "source_path": "Dataset/data_5/7.JPG",
+      "required_kinds": [
+        "R",
+        "U"
+      ],
+      "required_feature_gaps": [
+        "battery_glyph"
+      ],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": true
+    },
+    {
+      "id": "compensated-rc-divider",
+      "file": "cases/compensated-rc-divider.json",
+      "source_path": "Dataset/data_5/8.JPG",
+      "required_kinds": [
+        "R",
+        "C",
+        "U"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    },
+    {
+      "id": "parallel-series-rlc",
+      "file": "cases/parallel-series-rlc.json",
+      "source_path": "Dataset/data_5/222.JPG",
+      "required_kinds": [
+        "R",
+        "L",
+        "C",
+        "U"
+      ],
+      "required_feature_gaps": [],
+      "validation_status": "native_ac_passed; see validation-report.json for TD and visual scope",
+      "all_nominal_values_printed_in_reference": false
+    }
+  ],
+  "related_topology": {
+    "cases": [
+      "norton-divider",
+      "parallel-current-divider"
+    ],
+    "note": "Same electrical graph; distinct ground/return drawings. Retain both visual cases."
+  },
+  "references": [
+    {
+      "title": "Pinned source dataset",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/tree/7478979675be02c61f22a137ecde64b0eadc0232/Dataset"
+    },
+    {
+      "title": "Repository MIT software license",
+      "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/LICENSE"
+    },
+    {
+      "title": "Masala-CHAI paper v5",
+      "url": "https://arxiv.org/html/2411.14299v5"
+    }
+  ],
+  "source_preparation": "1kHz sine sources excite native AC. MCP edit_values makes constant-source copies for DC/step checks; source amplitude values are preserved.",
+  "validation": {
+    "report": "validation-report.json",
+    "completed_utc": "2026-10-26T20:30:42.799778+00:00",
+    "primary_ac": "18/18 passed",
+    "secondary_ac": "2/2 passed",
+    "notch": "2/2 passed",
+    "supported_transient": "14/14 passed",
+    "compensated_transient": "Both modes timed out with DC and delayed pulse excitation; AC-only acceptance; failures disclosed.",
+    "all_attempted_native_operations_passed": false,
+    "preview_gallery": "preview/manifest.json"
+  }
+}

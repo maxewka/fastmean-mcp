@@ -211,7 +211,8 @@ class PowerShellInstallerTests(unittest.TestCase):
                     str(DISTRIBUTION / "install.ps1"), option, "-InstallRoot", str(destination),
                     "-AppDir", str(app), "-PythonPath", sys.executable, "-CodexPath", str(fake_codex)],
                     capture_output=True, text=True, timeout=30)
-                if result.returncode and "UnauthorizedAccess" in result.stderr and "scripts is disabled" in result.stderr:
+                policy_message = " ".join(result.stderr.split()).replace("running ", "")
+                if result.returncode and "UnauthorizedAccess" in result.stderr and "scripts is disabled" in policy_message:
                     self.skipTest("This PowerShell host forbids scripts. No execution-policy change or bypass is performed.")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('"windows_settings_changed":', result.stdout)

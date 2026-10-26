@@ -30,7 +30,7 @@ from .schematic import create_circuit, edit_component_values, example_circuit, r
 from .symbolic import cirsym_from_fastmean_netlist, run_symbolic
 
 PROJECT = Path(__file__).resolve().parent.parent
-INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis. Start with status and example. Create circuits with adjacent components and real orthogonal wires; ports are external interfaces only. create_project builds portable native subcircuits from named fixed numeric definitions and complete pin connections; edit its saved project.spec.json and regenerate a new project to change definitions. Native instance parameter overrides are unsupported. annotate_circuit adds root numeric parameters, supported component bindings, explanatory text and saved TD/FD expressions to a new portable copy. Use relayout for old R/C/L/U port-stub circuits; preview returns a schematic PNG/SVG for supported geometry. AC/transient PNGs render native numerical data. Symbolic CIRSYM supports linear zero-state R/C/L and one voltage source, not arbitrary CAS or nonlinear models. Use exact ports from inspect. Results persist with run_id, paged data and MCP artifact resources. Sources are never overwritten; each operation gets a private folder. Long native requests support cancellation of owned processes only. GUI opening is a separate explicit open request; no desktop automation or Windows locale changes. Read fastmean://guide."""
+INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis. Start with status and example. Create circuits with adjacent components and real orthogonal wires; ports are external interfaces only. create_project builds portable native subcircuits from named fixed numeric definitions and complete pin connections; edit its saved project.spec.json and regenerate a new project to change definitions. Native instance parameter overrides are unsupported. annotate_circuit adds root numeric parameters, supported component bindings, explanatory text and saved TD/FD expressions to a new portable copy. Use relayout for old R/C/L/U port-stub circuits; preview returns a schematic PNG/SVG for supported geometry. AC/transient PNGs render native numerical data. Use plot on an original native run_id for saved-data PNG/SVG charts, separate display and measurement windows, units and time-weighted RMS/mean/peak; no plotting scripts or new simulation are needed. Symbolic CIRSYM supports linear zero-state R/C/L and one voltage source, not arbitrary CAS or nonlinear models. Use exact ports from inspect. Results persist with run_id, paged data and MCP artifact resources. Sources are never overwritten; each operation gets a private folder. Long native requests support cancellation of owned processes only. GUI opening is a separate explicit open request; no desktop automation or Windows locale changes. Read fastmean://guide."""
 
 mcp = MCPServer(name="fastmean", title="FASTMEAN circuit analysis", version=__version__,
                 instructions=INSTRUCTIONS, log_level="WARNING")
@@ -213,13 +213,18 @@ def fastmean_status() -> dict[str, Any]:
             "symbolic_available": bool(installation and (installation / "symbolic" / "cirsymw.exe").is_file()),
             "output_directory": str(output_dir()), "windows_locale_modified": False, "active_operations": active,
             "native_operations": ["AC frequency response", "transient analysis", "netlist export", "CIRSYM symbolic linear analysis"],
-            "authoring": "R/C/L/U, fixed numeric native D/G/E/F primitives, portable X subcircuit projects; DC/sine/pulse U waveforms",
+            "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
             "hierarchy": {"native_type": 7100, "max_model_definitions": 99, "max_pins_per_model": 32,
                           "parameter_overrides_supported": False,
                           "editing": "Modify saved project.spec.json and create a new project; originals remain unchanged"},
-            "annotations": "Root numeric .parameter constants, R/C/L/U bindings, explanatory TEXT and saved TD/FD signal expressions in a new copy",
+            "annotations": "Root numeric .parameter constants, R/C/L/U/I bindings, explanatory TEXT and saved TD/FD signal expressions in a new copy",
             "plot_origin": "Matplotlib PNG rendered from the native FASTMEAN numeric export",
-            "layout": "Compact spacing by default; real orthogonal wires, native junctions, bottom ground rail; external ports only",
+            "saved_data_charts": {"tool": "fastmean_plot", "max_panels": 12,
+                "input": "registered original native AC/transient run_id; exact exported columns",
+                "outputs": ["MCP ImageContent", "PNG", "SVG", "chart spec", "measurements", "provenance"],
+                "measurements": "transient time-weighted RMS/mean, peak/min/max/peak_to_peak; exact interpolated window endpoints",
+                "simulation_started": False},
+            "layout": "Compact spacing; exact native pin axes and orthogonal wires; four-unit explicit coordinates; bottom rail or local ground symbols; external ports only",
             "limits_numeric": {"max_ac_points": 10000, "max_transient_steps": 1000000, "max_signals": 30, "native_timeout_seconds": 60},
             "limits": ["No arbitrary CAS equation solver", "Symbolic adapter requires linear zero-state circuits",
                        "Native instance parameter overrides and arbitrary BJT/SPICE model import are unsupported",
@@ -246,9 +251,10 @@ def fastmean_create_circuit(spec: dict, name: str = "circuit") -> dict[str, Any]
     Start from fastmean_example. R/C/L values must be positive. Ground is 0.
     Components connect through physical wires and junctions; ports are external
     I/O only. Optional spec.layout.placements maps names to {x,y,rotation}; x/y
-    are multiples of 20 and rotation is 0=left/right,1=up/down,2/3=reversed.
+    are multiples of 4 and rotation is 0=left/right,1=up/down,2/3=reversed.
     spec.layout.density is compact (default) or standard. Explicit coordinates
-    stay unchanged; density controls automatic spacing only.
+    stay unchanged; density controls automatic spacing only. ground_style is
+    rail (default) or local. U nodes are [+,-]; I nodes are [from,to].
     All names used in analysis must be ASCII. Does not open a window.
     Fixed native primitives: D uses parameters={Ron,Roff,Uon}; G/VCCS,
     E/VCVS and F/CCCS use four native-ordered nodes and a numeric value.
@@ -305,7 +311,7 @@ def fastmean_annotate_circuit(path: str, parameters: dict | None = None, binding
     """Add numeric constants, text explanations and saved native formulas to a copy.
 
     parameters maps ASCII identifiers to finite numbers/SI literals. bindings
-    maps existing root R/C/L/U names to approved parameter expressions; native
+    maps existing root R/C/L/U/I names to approved parameter expressions; native
     child-instance parameter overrides are unsupported. descriptions adds plain
     explanatory native TEXT objects. [] clears saved traces; None preserves them.
     td_signals/fd_signals replace saved active
@@ -336,7 +342,7 @@ def fastmean_edit_values(path: str, updates: dict) -> dict[str, Any]:
     """Create an edited copy, retaining topology and unknown native objects.
 
     updates maps component names to SI values, or to {value:...,waveform:...}.
-    This supports R/C/L/U value edits and never overwrites the selected source.
+    This supports R/C/L/U/I value edits and never overwrites the selected source.
     """
     source = source_path(path)
     job = new_job("edit")
@@ -506,16 +512,18 @@ def fastmean_relayout(path: str, placements: dict | None = None,
 
 @mcp.tool(annotations=WRITE)
 @tool_errors
-def fastmean_preview(path: str) -> CallToolResult:
+def fastmean_preview(path: str, include_text: bool = True) -> CallToolResult:
     """Render a wire-connected SCM to readable PNG and SVG for visual review.
 
     This is an MCP rendering of native objects, not a FASTMEAN screenshot.
     Proven native L/midpoint bends are reconstructed exactly. Unsupported
     symbols/detours are rejected. No application window is opened.
+    include_text=False omits TEXT notes from this image and its bounds only;
+    all source annotations and parameter bindings remain unchanged.
     """
     from .preview import render_schematic
     source = source_path(path)
-    result = render_schematic(source, output_dir())
+    result = render_schematic(source, output_dir(), include_text=include_text)
     result["working_dir"] = str(Path(result["png_path"]).parent)
     result["source_path"] = str(source)
     result["source_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -536,6 +544,37 @@ def fastmean_get_result(run_id: str) -> CallToolResult:
     # Reading must not republish/update a result, so use the response renderer
     # separately from the publisher.
     return _with_image(store().get_run(run_id), publish=False)
+
+
+@mcp.tool(annotations=WRITE)
+@tool_errors
+def fastmean_plot(run_id: str,
+                  panels: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=12)] | None = None,
+                  display_window: list[Any] | None = None,
+                  measurement_window: list[Any] | None = None,
+                  title: Annotated[str, Field(min_length=1, max_length=160, strict=True)] | None = None,
+                  subtitle: Annotated[str, Field(min_length=1, max_length=240, strict=True)] | None = None,
+                  x_unit: Literal["s", "ms", "us", "Hz", "kHz", "MHz"] | None = None) -> CallToolResult:
+    """Plot a registered native run through MCP; no simulation or external script.
+
+    panels selects 1–12 exact exported columns. A panel is {signal, label?,
+    unit?, scale?:1, metrics?:[rms], guides?:[], color?:'#2563eb'}. Metrics are
+    rms/mean/peak/min/max/peak_to_peak; guides are mean/rms and include that
+    measurement. AC panels have metrics=[]; time-weighted metrics require TD.
+    unit is a caller-supplied display label; display_value=native_value*scale
+    with finite positive scale. No new formulas are evaluated. For native power,
+    export e.g. U(OUT)*I(RL) during transient and select that exact column here.
+    Windows are [start,stop] in original seconds/Hz, independently of x_unit.
+    Interpolate exact endpoints, retain adaptive timestamps, and reject
+    extrapolation. RMS uses trapezoids of squared samples. Metrics use the full
+    measurement window before graphical decimation. Original run stays intact;
+    a new run returns ImageContent, PNG/SVG/spec/measurements/manifest resources.
+    """
+    from .plotting import prepare_plot, render_plot
+    plan = prepare_plot(store(), run_id, panels=panels, display_window=display_window,
+                        measurement_window=measurement_window, title=title,
+                        subtitle=subtitle, x_unit=x_unit)
+    return _with_image(render_plot(plan, new_job("plot")))
 
 
 @mcp.tool(annotations=READ, structured_output=True)

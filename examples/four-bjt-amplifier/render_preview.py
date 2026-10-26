@@ -103,10 +103,10 @@ def draw(axis, source: Path, numerical_labels: bool = False):
 
 def save(figure, name):
     for extension in ("png", "svg"):
-        figure.savefig(ROOT / f"{name}.{extension}", dpi=160, facecolor="white",
+        figure.savefig(ROOT / f"offline-{name}.{extension}", dpi=160, facecolor="white",
                        metadata={"Creator": "FASTMEAN MCP / Matplotlib", **({"Date": None} if extension == "svg" else {})})
         if extension == "svg":
-            path = ROOT / f"{name}.svg"
+            path = ROOT / f"offline-{name}.svg"
             path.write_bytes(b"\n".join(line.rstrip(b" \t\r") for line in path.read_bytes().split(b"\n")))
     figure.clear()
 
@@ -141,7 +141,7 @@ def main():
         figure.text(.5, .025, "Фиксированные авторские эквиваленты, не заводские SPICE-модели · геометрия SCM, визуализация MCP/Matplotlib",
                     ha="center", fontsize=10, color="#64748b")
         save(figure, "subcircuit-preview")
-    print("Rendered preview.png/svg and subcircuit-preview.png/svg from preserved SCM geometry.")
+    print("Rendered offline-preview.png/svg and offline-subcircuit-preview.png/svg from preserved SCM geometry.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "id": "parallel-series-rlc",
+  "title": "Parallel L1/C feed and parallel L2/R load",
+  "source": {
+    "repo": "jitendra-bhandari/Masala-CHAI",
+    "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+    "path": "Dataset/data_5/222.JPG",
+    "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/222.JPG",
+    "image_sha256": "E6B1E0F1ACDE07B8CB02A5A122C9B4C7FFB4D26B6E1728E8E2C15A9F228FC48B"
+  },
+  "value_provenance": {
+    "printed_values": {
+      "Vi": "symbolic",
+      "L1": "symbolic",
+      "C": "symbolic",
+      "L2": "symbolic",
+      "R": "symbolic"
+    },
+    "benchmark_values_SI": {
+      "Vi": 1,
+      "L1": 0.01,
+      "L2": 0.02,
+      "C": 1e-07,
+      "R": 1000
+    },
+    "explanation": "All numbers newly declared.",
+    "source_component_names": "Reference symbolic labels are retained where practical; U1 and ordinal passive names are our identifiers.",
+    "component_values": {
+      "U1": {
+        "value_SI": 1,
+        "origin": "assigned_benchmark_value"
+      },
+      "L1": {
+        "value_SI": 0.01,
+        "origin": "assigned_benchmark_value"
+      },
+      "C1": {
+        "value_SI": 1e-07,
+        "origin": "assigned_benchmark_value"
+      },
+      "L2": {
+        "value_SI": 0.02,
+        "origin": "assigned_benchmark_value"
+      },
+      "R1": {
+        "value_SI": 1000,
+        "origin": "assigned_benchmark_value"
+      }
+    },
+    "source_waveform": "Assigned 1 kHz sine stimulus for native AC. For DC/step checks use an MCP edit_values copy with the same source value and waveform kind dc."
+  },
+  "limitations": [
+    "No original schematic pixels or original numerical solver outputs are bundled.",
+    "Source images contain textbook-derived drawings; image redistribution clearance is unestablished.",
+    "Placement coordinates are logical hand transcriptions on a 20-unit grid, not extracted original pixel coordinates.",
+    "Saved/native source-current sign must be verified independently; physical current directions below define the oracle.",
+    "Reference markers x and y are both on the same input net and are not separate electrical nodes."
+  ],
+  "required_kinds": [
+    "R",
+    "L",
+    "C",
+    "U"
+  ],
+  "circuit_spec": {
+    "title": "Parallel L1/C feed and parallel L2/R load",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 1,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "L",
+        "name": "L1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 0.01,
+        "initial_condition": 0
+      },
+      {
+        "kind": "C",
+        "name": "C1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 1e-07,
+        "initial_condition": 0
+      },
+      {
+        "kind": "L",
+        "name": "L2",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 0.02,
+        "initial_condition": 0
+      },
+      {
+        "kind": "R",
+        "name": "R1",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 1000
+      }
+    ],
+    "ports": [
+      "in",
+      "out"
+    ],
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-06
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 1000000,
+        "points": 601
+      }
+    },
+    "layout": {
+      "density": "compact",
+      "placements": {
+        "U1": {
+          "x": 600,
+          "y": 1100,
+          "rotation": 3
+        },
+        "L1": {
+          "x": 920,
+          "y": 800,
+          "rotation": 0
+        },
+        "C1": {
+          "x": 920,
+          "y": 1000,
+          "rotation": 0
+        },
+        "L2": {
+          "x": 1240,
+          "y": 1060,
+          "rotation": 1
+        },
+        "R1": {
+          "x": 1480,
+          "y": 1060,
+          "rotation": 1
+        }
+      },
+      "ports": {
+        "in": {
+          "x": 440,
+          "y": 1000,
+          "rotation": 2
+        },
+        "out": {
+          "x": 1640,
+          "y": 1000,
+          "rotation": 0
+        }
+      }
+    }
+  },
+  "automatic_circuit_spec": {
+    "title": "Parallel L1/C feed and parallel L2/R load",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 1,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "L",
+        "name": "L1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 0.01,
+        "initial_condition": 0
+      },
+      {
+        "kind": "C",
+        "name": "C1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 1e-07,
+        "initial_condition": 0
+      },
+      {
+        "kind": "L",
+        "name": "L2",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 0.02,
+        "initial_condition": 0
+      },
+      {
+        "kind": "R",
+        "name": "R1",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 1000
+      }
+    ],
+    "ports": [
+      "in",
+      "out"
+    ],
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-06
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 1000000,
+        "points": 601
+      }
+    },
+    "layout": {
+      "density": "compact"
+    }
+  },
+  "expected": {
+    "provenance": "Independent analytical expectations for the declared fixture; not FASTMEAN output and not original textbook answer data.",
+    "s_definition": "s=j*2*pi*f",
+    "frequency_sampling": "Use the spec frequency range with logarithmic spacing; insert analytic checkpoints explicitly if they are absent from the sampled grid.",
+    "dc": {
+      "finite_steady_operating_point": false,
+      "reason": "Ideal inductors form a DC path across a nonzero ideal voltage source; inductor current ramps.",
+      "low_frequency_voltage_gain_limit": 0.6666666666666666,
+      "comment": "This limit is an AC f→0 limit, not a finite DC solution."
+    },
+    "ac": {
+      "H": "L2*R1*(1+s^2*L1*C1)/(R1*(L1+L2)+s*L1*L2+s^2*R1*L1*L2*C1)",
+      "gain_unit": "V/V",
+      "low_frequency_gain_limit": 0.6666666666666666,
+      "high_frequency_gain_limit": 1,
+      "notch_Hz": 5032.921210448703,
+      "notch_absolute_magnitude_max": 0.0001,
+      "ignore_phase_at_zero": true,
+      "checkpoints": [
+        {
+          "f_Hz": 100,
+          "magnitude": 0.6665730628671384,
+          "phase_deg": -0.240061777325872
+        },
+        {
+          "f_Hz": 1000,
+          "magnitude": 0.6570488182402443,
+          "phase_deg": -2.463353932330119
+        },
+        {
+          "f_Hz": 10000,
+          "magnitude": 1.1664481831058207,
+          "phase_deg": 14.396038291516694
+        }
+      ]
+    },
+    "transient": {
+      "required": false,
+      "reason": "Use positive-frequency AC as primary numerical benchmark; no finite steady DC inductor current.",
+      "source_preparation": "MCP edit_values: preserve source amplitude value and set waveform={kind:dc} on a new copy."
+    }
+  },
+  "visual_goals": {
+    "reference_description": "Source left; L1 horizontal upper branch, C horizontal lower branch, sharing input/output nodes. L2 and R vertical to common bottom return, right of feed branches. x/y are separate terminal markers on SAME input net, not different nodes. Output terminals far right; preserve clear junction dots.",
+    "hard_gates": [
+      "No component or label collisions.",
+      "No accidental junctions, disconnected terminals or diagonal routes.",
+      "Real wires join adjacent primitives; ports identify external measurement nodes only.",
+      "Match reference branch orientation and relative component order.",
+      "Review reference-guided and automatic variants separately."
+    ],
+    "reference_guided_status": "Created through MCP and visually reviewed; see validation-report.json for numerical runs, geometry refreshes and remaining glyph differences.",
+    "automatic_status": "Created through MCP and visually reviewed. No per-case coordinates; rail/local ground style is retained. Arrangement differences are documented in validation-report.json."
+  }
+}

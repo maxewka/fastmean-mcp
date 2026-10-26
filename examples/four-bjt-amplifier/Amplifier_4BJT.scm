@@ -3,10 +3,10 @@ scm:
   MinorVersion: 1
   General:
     Scale: 100
-    HPos: 1340
-    VPos: 1320
-    SWidth: 3140
-    SHeight: 3570
+    HPos: 1422
+    VPos: 1200
+    SWidth: 3280
+    SHeight: 3330
   Special:
     LangVersion: 2
   Scheme:
@@ -139,7 +139,7 @@ scm:
             Delay: 0
             TFR: 1n
           AC:
-            U0: VinPeak
+            U0: Vi
             F: 1000.0
             PHI0: -90.0
             FD: 0
@@ -245,7 +245,7 @@ scm:
         FlipH: 0
         active_property_page: 0
         Params:
-          R: Rfeedback
+          R: Rf
       - ID: 10
         Type: 1000
         Name: RBIAS_P
@@ -387,7 +387,7 @@ scm:
         FlipH: 0
         active_property_page: 0
         Params:
-          R: Rfeedback
+          R: Rf
       - ID: 22
         Type: 1000
         Name: RBIAS_N
@@ -601,12 +601,57 @@ scm:
         Type: 200
         Name: GND1
         X: 240
-        Y: 2320
+        Y: 640
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
       - ID: 38
+        Type: 200
+        Name: GND2
+        X: 240
+        Y: 1680
+        Rot: 2
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 39
+        Type: 200
+        Name: GND3
+        X: 240
+        Y: 1280
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 40
+        Type: 200
+        Name: GND4
+        X: 460
+        Y: 1280
+        Rot: 1
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 41
+        Type: 200
+        Name: GND5
+        X: 460
+        Y: 1040
+        Rot: 1
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 42
+        Type: 200
+        Name: GND6
+        X: 2200
+        Y: 1440
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 43
         Type: 400
         Name: IN
         X: 440
@@ -615,7 +660,7 @@ scm:
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 39
+      - ID: 44
         Type: 400
         Name: OUT
         X: 2400
@@ -624,7 +669,7 @@ scm:
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 40
+      - ID: 45
         Type: 400
         Name: VPP
         X: 2400
@@ -633,7 +678,7 @@ scm:
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 41
+      - ID: 46
         Type: 400
         Name: VNN
         X: 2400
@@ -642,29 +687,11 @@ scm:
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 43
-        Type: 300
-        Name: CON43
-        X: 460
-        Y: 1160
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 44
-        Type: 300
-        Name: CON44
-        X: 460
-        Y: 1100
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
       - ID: 47
         Type: 300
         Name: CON47
-        X: 980
-        Y: 1440
+        X: 1260
+        Y: 400
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -672,17 +699,8 @@ scm:
       - ID: 48
         Type: 300
         Name: CON48
-        X: 980
-        Y: 1520
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 50
-        Type: 300
-        Name: CON50
-        X: 940
-        Y: 1520
+        X: 1260
+        Y: 1728
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -690,8 +708,8 @@ scm:
       - ID: 51
         Type: 300
         Name: CON51
-        X: 2120
-        Y: 1160
+        X: 1860
+        Y: 1728
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -699,17 +717,17 @@ scm:
       - ID: 52
         Type: 300
         Name: CON52
-        X: 1100
-        Y: 400
+        X: 1880
+        Y: 1140
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 53
+      - ID: 54
         Type: 300
-        Name: CON53
-        X: 1860
-        Y: 400
+        Name: CON54
+        X: 2120
+        Y: 620
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -726,8 +744,8 @@ scm:
       - ID: 57
         Type: 300
         Name: CON57
-        X: 1100
-        Y: 1500
+        X: 2200
+        Y: 1160
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -735,17 +753,26 @@ scm:
       - ID: 59
         Type: 300
         Name: CON59
-        X: 1060
-        Y: 740
+        X: 760
+        Y: 320
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 63
+      - ID: 60
         Type: 300
-        Name: CON63
-        X: 2120
-        Y: 1260
+        Name: CON60
+        X: 1076
+        Y: 320
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 62
+        Type: 300
+        Name: CON62
+        X: 1160
+        Y: 408
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -753,53 +780,35 @@ scm:
       - ID: 64
         Type: 300
         Name: CON64
+        X: 1608
+        Y: 440
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 65
+        Type: 300
+        Name: CON65
+        X: 1608
+        Y: 808
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 68
+        Type: 300
+        Name: CON68
         X: 1880
-        Y: 1140
+        Y: 328
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 66
+      - ID: 71
         Type: 300
-        Name: CON66
-        X: 980
-        Y: 880
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 67
-        Type: 300
-        Name: CON67
-        X: 980
-        Y: 800
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 69
-        Type: 300
-        Name: CON69
-        X: 940
-        Y: 800
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 70
-        Type: 300
-        Name: CON70
-        X: 1580
-        Y: 1440
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 72
-        Type: 300
-        Name: CON72
-        X: 1580
-        Y: 960
+        Name: CON71
+        X: 2380
+        Y: 328
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -807,17 +816,8 @@ scm:
       - ID: 73
         Type: 300
         Name: CON73
-        X: 1580
-        Y: 1280
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 74
-        Type: 300
-        Name: CON74
-        X: 1580
-        Y: 1700
+        X: 2560
+        Y: 1352
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -825,8 +825,8 @@ scm:
       - ID: 75
         Type: 300
         Name: CON75
-        X: 1580
-        Y: 620
+        X: 760
+        Y: 2000
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -834,8 +834,17 @@ scm:
       - ID: 77
         Type: 300
         Name: CON77
-        X: 1140
-        Y: 1360
+        X: 1076
+        Y: 2000
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 78
+        Type: 300
+        Name: CON78
+        X: 1160
+        Y: 1912
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -844,16 +853,16 @@ scm:
         Type: 300
         Name: CON79
         X: 1580
-        Y: 940
+        Y: 2000
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 81
+      - ID: 80
         Type: 300
-        Name: CON81
-        X: 1680
-        Y: 940
+        Name: CON80
+        X: 1880
+        Y: 2000
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -861,17 +870,8 @@ scm:
       - ID: 83
         Type: 300
         Name: CON83
-        X: 1880
-        Y: 1000
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 85
-        Type: 300
-        Name: CON85
-        X: 1800
-        Y: 1000
+        X: 412
+        Y: 1112
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -879,8 +879,8 @@ scm:
       - ID: 86
         Type: 300
         Name: CON86
-        X: 1880
-        Y: 1320
+        X: 460
+        Y: 1160
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -888,8 +888,8 @@ scm:
       - ID: 88
         Type: 300
         Name: CON88
-        X: 1800
-        Y: 1320
+        X: 956
+        Y: 880
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -897,8 +897,17 @@ scm:
       - ID: 89
         Type: 300
         Name: CON89
-        X: 760
-        Y: 1460
+        X: 980
+        Y: 880
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 90
+        Type: 300
+        Name: CON90
+        X: 956
+        Y: 1440
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -906,8 +915,8 @@ scm:
       - ID: 92
         Type: 300
         Name: CON92
-        X: 780
-        Y: 1640
+        X: 980
+        Y: 1440
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -915,8 +924,17 @@ scm:
       - ID: 94
         Type: 300
         Name: CON94
-        X: 760
-        Y: 860
+        X: 224
+        Y: 2080
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 96
+        Type: 300
+        Name: CON96
+        X: 564
+        Y: 1832
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -924,8 +942,8 @@ scm:
       - ID: 97
         Type: 300
         Name: CON97
-        X: 780
-        Y: 680
+        X: 1160
+        Y: 1368
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -933,8 +951,8 @@ scm:
       - ID: 99
         Type: 300
         Name: CON99
-        X: 1880
-        Y: 2000
+        X: 1540
+        Y: 1440
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -942,17 +960,8 @@ scm:
       - ID: 101
         Type: 300
         Name: CON101
-        X: 760
-        Y: 2000
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 102
-        Type: 300
-        Name: CON102
-        X: 1160
-        Y: 2000
+        X: 1580
+        Y: 1484
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -960,8 +969,8 @@ scm:
       - ID: 103
         Type: 300
         Name: CON103
-        X: 1580
-        Y: 2000
+        X: 1660
+        Y: 1280
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -969,17 +978,8 @@ scm:
       - ID: 104
         Type: 300
         Name: CON104
-        X: 1880
-        Y: 320
-        Rot: 0
-        FlipV: 0
-        FlipH: 0
-        active_property_page: 0
-      - ID: 106
-        Type: 300
-        Name: CON106
-        X: 760
-        Y: 320
+        X: 1668
+        Y: 432
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -987,8 +987,8 @@ scm:
       - ID: 107
         Type: 300
         Name: CON107
-        X: 1160
-        Y: 320
+        X: 1772
+        Y: 1484
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -996,17 +996,26 @@ scm:
       - ID: 108
         Type: 300
         Name: CON108
-        X: 1160
-        Y: 440
+        X: 1900
+        Y: 648
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 110
+      - ID: 109
         Type: 300
-        Name: CON110
-        X: 240
-        Y: 2240
+        Name: CON109
+        X: 1900
+        Y: 832
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 111
+        Type: 300
+        Name: CON111
+        X: 2560
+        Y: 2080
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1014,8 +1023,8 @@ scm:
       - ID: 112
         Type: 300
         Name: CON112
-        X: 200
-        Y: 580
+        X: 1160
+        Y: 1370
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1023,8 +1032,8 @@ scm:
       - ID: 113
         Type: 300
         Name: CON113
-        X: 200
-        Y: 1040
+        X: 1580
+        Y: 1296
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1032,26 +1041,35 @@ scm:
       - ID: 114
         Type: 300
         Name: CON114
-        X: 200
-        Y: 1220
+        X: 1580
+        Y: 1370
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 115
+      - ID: 116
         Type: 300
-        Name: CON115
-        X: 200
-        Y: 1740
+        Name: CON116
+        X: 1696
+        Y: 1208
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 119
+      - ID: 118
         Type: 300
-        Name: CON119
-        X: 520
-        Y: 1040
+        Name: CON118
+        X: 1772
+        Y: 968
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 120
+        Type: 300
+        Name: CON120
+        X: 1820
+        Y: 1208
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1059,25 +1077,160 @@ scm:
       - ID: 122
         Type: 300
         Name: CON122
-        X: 2420
-        Y: 1380
+        X: 760
+        Y: 920
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
-      - ID: 123
+      - ID: 125
+        Type: 300
+        Name: CON125
+        X: 1012
+        Y: 680
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 127
+        Type: 300
+        Name: CON127
+        X: 1076
+        Y: 872
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 130
+        Type: 300
+        Name: CON130
+        X: 760
+        Y: 1372
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 133
+        Type: 300
+        Name: CON133
+        X: 1012
+        Y: 1640
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 135
+        Type: 300
+        Name: CON135
+        X: 1076
+        Y: 1460
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 136
+        Type: 300
+        Name: CON136
+        X: 1580
+        Y: 620
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 137
+        Type: 300
+        Name: CON137
+        X: 1580
+        Y: 1700
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 139
+        Type: 300
+        Name: CON139
+        X: 1860
+        Y: 1040
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 140
+        Type: 300
+        Name: CON140
+        X: 1880
+        Y: 1000
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 142
+        Type: 300
+        Name: CON142
+        X: 1860
+        Y: 1320
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 143
+        Type: 300
+        Name: CON143
+        X: 1880
+        Y: 1320
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 145
+        Type: 300
+        Name: CON145
+        X: 740
+        Y: 880
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 146
+        Type: 300
+        Name: CON146
+        X: 772
+        Y: 820
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 149
+        Type: 300
+        Name: CON149
+        X: 740
+        Y: 1500
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 151
+        Type: 300
+        Name: CON151
+        X: 772
+        Y: 1500
+        Rot: 0
+        FlipV: 0
+        FlipH: 0
+        active_property_page: 0
+      - ID: 152
         Type: 900
-        Name: MCP_NOTE_123
-        X: 200
-        Y: 2440
+        Name: MCP_NOTE_152
+        X: 224
+        Y: 2200
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
         Params:
-          Text: ".parameter\r\nRload=1.25 \"Rload [ohm]\";\r\nRfeedback=2958.192887903313 \"Rfeedback [ohm]\";\r\nCinput=0.001\
-            \ \"Cinput [F]\";\r\nCbootstrap=0.01 \"Cbootstrap [F]\";\r\nRbias=69.04195248892718 \"Rbias [ohm]\";\r\nVrail=38\
-            \ \"Vrail [V]\";\r\nVinPeak=1.4142135623730951 \"VinPeak [V]\";\r\n"
+          Text: ".parameter\r\nRload=1.25 \"Rload [ohm]\";\r\nRf=2958.192887903313 \"Rf [ohm]\";\r\nCinput=0.001 \"Cinput\
+            \ [F]\";\r\nCbootstrap=0.01 \"Cbootstrap [F]\";\r\nRbias=69.04195248892718 \"Rbias [ohm]\";\r\nVrail=38 \"Vrail\
+            \ [V]\";\r\nVi=1.4142135623730951 \"Vi [V]\";\r\n"
           Color: 00808000
           Font:
             lfHeight: -16
@@ -1094,11 +1247,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 124
+      - ID: 153
         Type: 900
-        Name: MCP_NOTE_124
-        X: 200
-        Y: 2651
+        Name: MCP_NOTE_153
+        X: 224
+        Y: 2411
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1121,11 +1274,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 125
+      - ID: 154
         Type: 900
-        Name: MCP_NOTE_125
-        X: 200
-        Y: 2730
+        Name: MCP_NOTE_154
+        X: 224
+        Y: 2490
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1148,11 +1301,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 126
+      - ID: 155
         Type: 900
-        Name: MCP_NOTE_126
-        X: 200
-        Y: 2809
+        Name: MCP_NOTE_155
+        X: 224
+        Y: 2569
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1175,11 +1328,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 127
+      - ID: 156
         Type: 900
-        Name: MCP_NOTE_127
-        X: 200
-        Y: 2888
+        Name: MCP_NOTE_156
+        X: 224
+        Y: 2648
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1202,11 +1355,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 128
+      - ID: 157
         Type: 900
-        Name: MCP_NOTE_128
-        X: 200
-        Y: 2967
+        Name: MCP_NOTE_157
+        X: 224
+        Y: 2727
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1229,17 +1382,17 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 129
+      - ID: 158
         Type: 900
-        Name: MCP_NOTE_129
-        X: 200
-        Y: 3046
+        Name: MCP_NOTE_158
+        X: 224
+        Y: 2806
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
         Params:
-          Text: "I(VIN) — ток входного источника.\r\nНоминально66,8 мА RMS, пик94,5 мА. VinPeak — амплитуда, не RMS."
+          Text: "I(VIN) — ток входного источника.\r\nНоминально66,8 мА RMS, пик94,5 мА. Vi — амплитуда, не RMS."
           Color: 00808000
           Font:
             lfHeight: -16
@@ -1256,11 +1409,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 130
+      - ID: 159
         Type: 900
-        Name: MCP_NOTE_130
-        X: 200
-        Y: 3125
+        Name: MCP_NOTE_159
+        X: 224
+        Y: 2885
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1284,18 +1437,17 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 131
+      - ID: 160
         Type: 900
-        Name: MCP_NOTE_131
-        X: 200
-        Y: 3226
+        Name: MCP_NOTE_160
+        X: 224
+        Y: 2986
         Rot: 0
         FlipV: 0
         FlipH: 0
         active_property_page: 0
         Params:
-          Text: "Параметры: Rload — нагрузка; Rfeedback — обе цепи ОС;\r\nCinput/Cbootstrap — парные ёмкости; Rbias — настройка\
-            \ смещения."
+          Text: "Параметры: Rload — нагрузка; Rf — обе цепи ОС;\r\nCinput/Cbootstrap — парные ёмкости; Rbias — настройка смещения."
           Color: 00808000
           Font:
             lfHeight: -16
@@ -1312,11 +1464,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 132
+      - ID: 161
         Type: 900
-        Name: MCP_NOTE_132
-        X: 200
-        Y: 3305
+        Name: MCP_NOTE_161
+        X: 224
+        Y: 3065
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1340,11 +1492,11 @@ scm:
             lfQuality: 0
             lfPitchAndFamily: 0
             lfFaceName: Courier New
-      - ID: 133
+      - ID: 162
         Type: 900
-        Name: MCP_NOTE_133
-        X: 200
-        Y: 3384
+        Name: MCP_NOTE_162
+        X: 224
+        Y: 3144
         Rot: 0
         FlipV: 0
         FlipH: 0
@@ -1370,626 +1522,698 @@ scm:
             lfFaceName: Courier New
     Wires:
       - obj1:
-          ID: 44
-          pin: 1
-        obj2:
-          ID: 3
-          pin: 2
-      - obj1:
-          ID: 38
-          pin: 1
-        obj2:
-          ID: 43
-          pin: 1
-      - obj1:
-          ID: 43
-          pin: 4
-        obj2:
-          ID: 7
-          pin: 2
-      - obj1:
-          ID: 43
-          pin: 2
-        obj2:
-          ID: 44
-          pin: 4
-      - obj1:
-          ID: 44
-          pin: 2
-        obj2:
-          ID: 19
-          pin: 2
-      - obj1:
-          ID: 7
-          pin: 1
-        obj2:
-          ID: 8
-          pin: 1
-      - obj1:
-          ID: 8
-          pin: 2
-        obj2:
-          ID: 47
-          pin: 1
-      - obj1:
-          ID: 47
-          pin: 3
-        obj2:
-          ID: 33
-          pin: 1
-      - obj1:
-          ID: 47
-          pin: 4
-        obj2:
-          ID: 48
-          pin: 2
-      - obj1:
-          ID: 10
-          pin: 2
-        obj2:
-          ID: 48
-          pin: 4
-      - obj1:
-          ID: 48
-          pin: 1
-        obj2:
-          ID: 50
-          pin: 3
-      - obj1:
-          ID: 9
-          pin: 2
-        obj2:
-          ID: 50
-          pin: 4
-      - obj1:
-          ID: 51
-          pin: 3
-        obj2:
-          ID: 39
-          pin: 1
-      - obj1:
-          ID: 51
-          pin: 2
-        obj2:
-          ID: 55
-          pin: 4
-      - obj1:
-          ID: 51
-          pin: 4
-        obj2:
-          ID: 63
-          pin: 2
-      - obj1:
           ID: 21
           pin: 1
         obj2:
-          ID: 52
+          ID: 47
           pin: 1
-      - obj1:
-          ID: 52
-          pin: 3
-        obj2:
-          ID: 53
-          pin: 1
-      - obj1:
-          ID: 52
-          pin: 4
-        obj2:
-          ID: 59
-          pin: 3
-      - obj1:
-          ID: 53
-          pin: 3
-        obj2:
-          ID: 55
-          pin: 2
-      - obj1:
-          ID: 53
-          pin: 4
-        obj2:
-          ID: 6
-          pin: 2
-      - obj1:
-          ID: 55
-          pin: 1
-        obj2:
-          ID: 64
-          pin: 3
       - obj1:
           ID: 9
           pin: 1
         obj2:
-          ID: 57
+          ID: 48
           pin: 4
       - obj1:
-          ID: 57
-          pin: 1
-        obj2:
-          ID: 59
+          ID: 47
           pin: 4
+        obj2:
+          ID: 48
+          pin: 2
+      - obj1:
+          ID: 47
+          pin: 3
+        obj2:
+          ID: 54
+          pin: 2
+      - obj1:
+          ID: 48
+          pin: 3
+        obj2:
+          ID: 51
+          pin: 1
+      - obj1:
+          ID: 6
+          pin: 2
+        obj2:
+          ID: 54
+          pin: 1
       - obj1:
           ID: 18
           pin: 2
         obj2:
-          ID: 63
-          pin: 4
+          ID: 51
+          pin: 2
       - obj1:
-          ID: 63
+          ID: 28
+          pin: 2
+        obj2:
+          ID: 52
+          pin: 2
+      - obj1:
+          ID: 52
+          pin: 4
+        obj2:
+          ID: 29
+          pin: 2
+      - obj1:
+          ID: 52
           pin: 3
+        obj2:
+          ID: 55
+          pin: 1
+      - obj1:
+          ID: 54
+          pin: 4
+        obj2:
+          ID: 55
+          pin: 2
+      - obj1:
+          ID: 55
+          pin: 4
+        obj2:
+          ID: 57
+          pin: 1
+      - obj1:
+          ID: 57
+          pin: 4
         obj2:
           ID: 30
           pin: 1
       - obj1:
-          ID: 28
+          ID: 57
+          pin: 3
+        obj2:
+          ID: 44
+          pin: 1
+      - obj1:
+          ID: 1
           pin: 2
         obj2:
-          ID: 64
+          ID: 59
+          pin: 1
+      - obj1:
+          ID: 59
+          pin: 4
+        obj2:
+          ID: 24
+          pin: 1
+      - obj1:
+          ID: 59
+          pin: 3
+        obj2:
+          ID: 60
+          pin: 1
+      - obj1:
+          ID: 60
+          pin: 4
+        obj2:
+          ID: 62
+          pin: 1
+      - obj1:
+          ID: 60
+          pin: 3
+        obj2:
+          ID: 68
           pin: 2
+      - obj1:
+          ID: 62
+          pin: 4
+        obj2:
+          ID: 34
+          pin: 2
+      - obj1:
+          ID: 4
+          pin: 1
+        obj2:
+          ID: 64
+          pin: 1
       - obj1:
           ID: 64
           pin: 4
         obj2:
-          ID: 29
+          ID: 65
           pin: 2
+      - obj1:
+          ID: 65
+          pin: 4
+        obj2:
+          ID: 73
+          pin: 1
+      - obj1:
+          ID: 65
+          pin: 3
+        obj2:
+          ID: 35
+          pin: 2
+      - obj1:
+          ID: 68
+          pin: 3
+        obj2:
+          ID: 71
+          pin: 1
+      - obj1:
+          ID: 71
+          pin: 2
+        obj2:
+          ID: 45
+          pin: 1
+      - obj1:
+          ID: 71
+          pin: 3
+        obj2:
+          ID: 73
+          pin: 2
+      - obj1:
+          ID: 2
+          pin: 1
+        obj2:
+          ID: 75
+          pin: 1
+      - obj1:
+          ID: 15
+          pin: 2
+        obj2:
+          ID: 75
+          pin: 2
+      - obj1:
+          ID: 75
+          pin: 3
+        obj2:
+          ID: 77
+          pin: 1
+      - obj1:
+          ID: 77
+          pin: 2
+        obj2:
+          ID: 78
+          pin: 1
+      - obj1:
+          ID: 77
+          pin: 3
+        obj2:
+          ID: 79
+          pin: 1
+      - obj1:
+          ID: 33
+          pin: 3
+        obj2:
+          ID: 78
+          pin: 2
+      - obj1:
+          ID: 16
+          pin: 1
+        obj2:
+          ID: 79
+          pin: 2
+      - obj1:
+          ID: 79
+          pin: 3
+        obj2:
+          ID: 80
+          pin: 1
+      - obj1:
+          ID: 36
+          pin: 3
+        obj2:
+          ID: 80
+          pin: 2
+      - obj1:
+          ID: 80
+          pin: 3
+        obj2:
+          ID: 46
+          pin: 1
+      - obj1:
+          ID: 3
+          pin: 2
+        obj2:
+          ID: 83
+          pin: 1
+      - obj1:
+          ID: 83
+          pin: 2
+        obj2:
+          ID: 19
+          pin: 2
+      - obj1:
+          ID: 83
+          pin: 4
+        obj2:
+          ID: 7
+          pin: 2
+      - obj1:
+          ID: 83
+          pin: 3
+        obj2:
+          ID: 86
+          pin: 2
+      - obj1:
+          ID: 43
+          pin: 1
+        obj2:
+          ID: 86
+          pin: 1
       - obj1:
           ID: 20
           pin: 2
         obj2:
-          ID: 66
+          ID: 88
           pin: 1
       - obj1:
-          ID: 66
-          pin: 3
-        obj2:
-          ID: 34
-          pin: 1
-      - obj1:
-          ID: 66
+          ID: 88
           pin: 2
         obj2:
-          ID: 67
-          pin: 4
+          ID: 21
+          pin: 2
+      - obj1:
+          ID: 88
+          pin: 3
+        obj2:
+          ID: 89
+          pin: 1
       - obj1:
           ID: 22
           pin: 2
         obj2:
-          ID: 67
+          ID: 89
           pin: 2
       - obj1:
-          ID: 67
+          ID: 89
+          pin: 3
+        obj2:
+          ID: 34
           pin: 1
-        obj2:
-          ID: 69
-          pin: 3
       - obj1:
-          ID: 21
+          ID: 8
           pin: 2
         obj2:
-          ID: 69
-          pin: 2
+          ID: 90
+          pin: 1
       - obj1:
-          ID: 70
-          pin: 2
-        obj2:
-          ID: 73
-          pin: 4
-      - obj1:
-          ID: 70
+          ID: 90
           pin: 4
         obj2:
-          ID: 17
+          ID: 9
           pin: 2
       - obj1:
-          ID: 70
+          ID: 90
           pin: 3
         obj2:
-          ID: 36
+          ID: 92
+          pin: 1
+      - obj1:
+          ID: 92
+          pin: 4
+        obj2:
+          ID: 10
+          pin: 2
+      - obj1:
+          ID: 92
+          pin: 3
+        obj2:
+          ID: 33
+          pin: 1
+      - obj1:
+          ID: 94
+          pin: 2
+        obj2:
+          ID: 96
+          pin: 1
+      - obj1:
+          ID: 94
+          pin: 3
+        obj2:
+          ID: 111
+          pin: 1
+      - obj1:
+          ID: 96
+          pin: 2
+        obj2:
+          ID: 97
           pin: 1
       - obj1:
           ID: 34
           pin: 3
         obj2:
-          ID: 72
-          pin: 1
-      - obj1:
-          ID: 72
-          pin: 4
-        obj2:
-          ID: 73
+          ID: 97
           pin: 2
       - obj1:
-          ID: 73
+          ID: 99
+          pin: 2
+        obj2:
+          ID: 104
+          pin: 1
+      - obj1:
+          ID: 99
           pin: 3
         obj2:
-          ID: 32
-          pin: 1
-      - obj1:
-          ID: 74
+          ID: 101
           pin: 2
+      - obj1:
+          ID: 101
+          pin: 4
         obj2:
           ID: 17
-          pin: 1
-      - obj1:
-          ID: 74
-          pin: 4
-        obj2:
-          ID: 16
           pin: 2
       - obj1:
-          ID: 74
+          ID: 101
           pin: 3
         obj2:
-          ID: 18
+          ID: 107
           pin: 1
       - obj1:
-          ID: 75
+          ID: 103
           pin: 2
         obj2:
-          ID: 4
-          pin: 2
-      - obj1:
-          ID: 75
-          pin: 4
-        obj2:
-          ID: 5
+          ID: 109
           pin: 1
       - obj1:
-          ID: 75
+          ID: 103
           pin: 3
         obj2:
-          ID: 6
+          ID: 32
           pin: 1
       - obj1:
-          ID: 33
-          pin: 2
-        obj2:
-          ID: 77
-          pin: 3
-      - obj1:
-          ID: 77
-          pin: 2
-        obj2:
-          ID: 79
-          pin: 1
-      - obj1:
-          ID: 79
-          pin: 2
-        obj2:
-          ID: 5
-          pin: 2
-      - obj1:
-          ID: 79
-          pin: 3
-        obj2:
-          ID: 81
-          pin: 1
-      - obj1:
-          ID: 31
-          pin: 2
-        obj2:
-          ID: 81
-          pin: 4
-      - obj1:
-          ID: 81
-          pin: 2
-        obj2:
-          ID: 35
-          pin: 1
-      - obj1:
-          ID: 12
-          pin: 2
-        obj2:
-          ID: 13
-          pin: 1
-      - obj1:
-          ID: 13
-          pin: 2
-        obj2:
-          ID: 14
-          pin: 1
-      - obj1:
-          ID: 14
-          pin: 2
-        obj2:
-          ID: 15
-          pin: 1
-      - obj1:
-          ID: 24
-          pin: 2
-        obj2:
-          ID: 25
-          pin: 1
-      - obj1:
-          ID: 25
-          pin: 2
-        obj2:
-          ID: 26
-          pin: 1
-      - obj1:
-          ID: 26
-          pin: 2
-        obj2:
-          ID: 27
-          pin: 1
-      - obj1:
-          ID: 83
-          pin: 2
-        obj2:
-          ID: 35
-          pin: 3
-      - obj1:
-          ID: 83
+          ID: 104
           pin: 4
         obj2:
-          ID: 28
+          ID: 108
           pin: 1
       - obj1:
-          ID: 83
-          pin: 1
-        obj2:
-          ID: 85
-          pin: 3
-      - obj1:
-          ID: 31
-          pin: 1
-        obj2:
-          ID: 85
-          pin: 4
-      - obj1:
-          ID: 86
+          ID: 107
           pin: 2
-        obj2:
-          ID: 29
-          pin: 1
-      - obj1:
-          ID: 86
-          pin: 4
         obj2:
           ID: 36
-          pin: 2
-      - obj1:
-          ID: 86
           pin: 1
-        obj2:
-          ID: 88
+      - obj1:
+          ID: 107
           pin: 3
-      - obj1:
-          ID: 32
-          pin: 2
         obj2:
-          ID: 88
+          ID: 111
           pin: 2
       - obj1:
-          ID: 19
-          pin: 1
+          ID: 108
+          pin: 4
         obj2:
-          ID: 20
+          ID: 109
+          pin: 2
+      - obj1:
+          ID: 112
+          pin: 4
+        obj2:
+          ID: 33
+          pin: 2
+      - obj1:
+          ID: 112
+          pin: 3
+        obj2:
+          ID: 114
           pin: 1
       - obj1:
-          ID: 89
+          ID: 5
+          pin: 2
+        obj2:
+          ID: 113
+          pin: 2
+      - obj1:
+          ID: 113
+          pin: 4
+        obj2:
+          ID: 114
+          pin: 2
+      - obj1:
+          ID: 113
+          pin: 3
+        obj2:
+          ID: 120
+          pin: 4
+      - obj1:
+          ID: 116
+          pin: 2
+        obj2:
+          ID: 31
+          pin: 2
+      - obj1:
+          ID: 116
+          pin: 3
+        obj2:
+          ID: 120
+          pin: 1
+      - obj1:
+          ID: 118
+          pin: 2
+        obj2:
+          ID: 35
+          pin: 1
+      - obj1:
+          ID: 118
+          pin: 3
+        obj2:
+          ID: 120
+          pin: 2
+      - obj1:
+          ID: 23
+          pin: 2
+        obj2:
+          ID: 122
+          pin: 4
+      - obj1:
+          ID: 27
+          pin: 2
+        obj2:
+          ID: 122
+          pin: 2
+      - obj1:
+          ID: 122
+          pin: 3
+        obj2:
+          ID: 127
+          pin: 4
+      - obj1:
+          ID: 22
+          pin: 1
+        obj2:
+          ID: 125
+          pin: 1
+      - obj1:
+          ID: 125
+          pin: 4
+        obj2:
+          ID: 127
+          pin: 1
+      - obj1:
+          ID: 11
+          pin: 2
+        obj2:
+          ID: 130
+          pin: 2
+      - obj1:
+          ID: 130
           pin: 4
         obj2:
           ID: 12
           pin: 1
       - obj1:
-          ID: 89
+          ID: 130
           pin: 3
         obj2:
-          ID: 92
-          pin: 2
-      - obj1:
-          ID: 89
-          pin: 2
-        obj2:
-          ID: 11
+          ID: 135
           pin: 2
       - obj1:
           ID: 10
           pin: 1
         obj2:
-          ID: 92
-          pin: 3
+          ID: 133
+          pin: 1
       - obj1:
-          ID: 94
-          pin: 3
+          ID: 133
+          pin: 2
         obj2:
-          ID: 97
-          pin: 4
+          ID: 135
+          pin: 1
       - obj1:
-          ID: 94
-          pin: 4
+          ID: 4
+          pin: 2
         obj2:
-          ID: 23
+          ID: 136
           pin: 2
       - obj1:
-          ID: 94
+          ID: 136
+          pin: 4
+        obj2:
+          ID: 5
+          pin: 1
+      - obj1:
+          ID: 136
+          pin: 3
+        obj2:
+          ID: 6
+          pin: 1
+      - obj1:
+          ID: 17
+          pin: 1
+        obj2:
+          ID: 137
+          pin: 2
+      - obj1:
+          ID: 137
+          pin: 4
+        obj2:
+          ID: 16
+          pin: 2
+      - obj1:
+          ID: 137
+          pin: 3
+        obj2:
+          ID: 18
+          pin: 1
+      - obj1:
+          ID: 31
+          pin: 1
+        obj2:
+          ID: 139
+          pin: 1
+      - obj1:
+          ID: 139
+          pin: 2
+        obj2:
+          ID: 140
+          pin: 1
+      - obj1:
+          ID: 35
+          pin: 3
+        obj2:
+          ID: 140
+          pin: 2
+      - obj1:
+          ID: 140
+          pin: 4
+        obj2:
+          ID: 28
+          pin: 1
+      - obj1:
+          ID: 32
+          pin: 2
+        obj2:
+          ID: 142
+          pin: 2
+      - obj1:
+          ID: 142
+          pin: 3
+        obj2:
+          ID: 143
+          pin: 1
+      - obj1:
+          ID: 29
+          pin: 1
+        obj2:
+          ID: 143
+          pin: 2
+      - obj1:
+          ID: 143
+          pin: 4
+        obj2:
+          ID: 36
+          pin: 2
+      - obj1:
+          ID: 19
+          pin: 1
+        obj2:
+          ID: 145
+          pin: 1
+      - obj1:
+          ID: 145
+          pin: 2
+        obj2:
+          ID: 146
+          pin: 1
+      - obj1:
+          ID: 146
+          pin: 4
+        obj2:
+          ID: 20
+          pin: 1
+      - obj1:
+          ID: 7
+          pin: 1
+        obj2:
+          ID: 149
+          pin: 2
+      - obj1:
+          ID: 149
+          pin: 3
+        obj2:
+          ID: 151
+          pin: 1
+      - obj1:
+          ID: 151
+          pin: 2
+        obj2:
+          ID: 8
+          pin: 1
+      - obj1:
+          ID: 24
+          pin: 2
+        obj2:
+          ID: 25
+          pin: 1
+      - obj1:
+          ID: 25
+          pin: 2
+        obj2:
+          ID: 26
+          pin: 1
+      - obj1:
+          ID: 26
           pin: 2
         obj2:
           ID: 27
-          pin: 2
-      - obj1:
-          ID: 22
           pin: 1
-        obj2:
-          ID: 97
-          pin: 3
       - obj1:
-          ID: 99
+          ID: 12
           pin: 2
         obj2:
-          ID: 36
-          pin: 3
+          ID: 13
+          pin: 1
       - obj1:
-          ID: 99
-          pin: 3
+          ID: 13
+          pin: 2
         obj2:
-          ID: 41
+          ID: 14
           pin: 1
       - obj1:
-          ID: 99
-          pin: 1
-        obj2:
-          ID: 103
-          pin: 3
-      - obj1:
-          ID: 2
-          pin: 1
-        obj2:
-          ID: 101
-          pin: 1
-      - obj1:
-          ID: 101
-          pin: 3
-        obj2:
-          ID: 102
-          pin: 1
-      - obj1:
-          ID: 101
+          ID: 14
           pin: 2
         obj2:
           ID: 15
-          pin: 2
-      - obj1:
-          ID: 102
-          pin: 3
-        obj2:
-          ID: 103
           pin: 1
-      - obj1:
-          ID: 102
-          pin: 2
-        obj2:
-          ID: 33
-          pin: 3
-      - obj1:
-          ID: 103
-          pin: 2
-        obj2:
-          ID: 16
-          pin: 1
-      - obj1:
-          ID: 104
-          pin: 4
-        obj2:
-          ID: 35
-          pin: 2
-      - obj1:
-          ID: 104
-          pin: 3
-        obj2:
-          ID: 40
-          pin: 1
-      - obj1:
-          ID: 104
-          pin: 1
-        obj2:
-          ID: 107
-          pin: 3
       - obj1:
           ID: 1
-          pin: 2
-        obj2:
-          ID: 106
           pin: 1
-      - obj1:
-          ID: 106
-          pin: 3
-        obj2:
-          ID: 107
-          pin: 1
-      - obj1:
-          ID: 106
-          pin: 4
-        obj2:
-          ID: 24
-          pin: 1
-      - obj1:
-          ID: 107
-          pin: 4
-        obj2:
-          ID: 108
-          pin: 2
-      - obj1:
-          ID: 34
-          pin: 2
-        obj2:
-          ID: 108
-          pin: 4
-      - obj1:
-          ID: 108
-          pin: 3
-        obj2:
-          ID: 4
-          pin: 1
-      - obj1:
-          ID: 110
-          pin: 1
-        obj2:
-          ID: 115
-          pin: 4
-      - obj1:
-          ID: 110
-          pin: 3
-        obj2:
-          ID: 122
-          pin: 4
-      - obj1:
-          ID: 110
-          pin: 4
         obj2:
           ID: 37
           pin: 1
       - obj1:
-          ID: 1
-          pin: 1
-        obj2:
-          ID: 112
-          pin: 3
-      - obj1:
-          ID: 112
-          pin: 4
-        obj2:
-          ID: 113
-          pin: 2
-      - obj1:
-          ID: 113
-          pin: 3
-        obj2:
-          ID: 119
-          pin: 1
-      - obj1:
-          ID: 113
-          pin: 4
-        obj2:
-          ID: 114
-          pin: 2
-      - obj1:
-          ID: 114
-          pin: 3
-        obj2:
           ID: 3
           pin: 1
-      - obj1:
-          ID: 114
-          pin: 4
         obj2:
-          ID: 115
-          pin: 2
+          ID: 39
+          pin: 1
       - obj1:
-          ID: 115
-          pin: 3
+          ID: 38
+          pin: 1
         obj2:
           ID: 2
           pin: 2
       - obj1:
-          ID: 23
+          ID: 41
           pin: 1
         obj2:
-          ID: 119
-          pin: 3
+          ID: 23
+          pin: 1
       - obj1:
-          ID: 119
-          pin: 4
+          ID: 40
+          pin: 1
         obj2:
           ID: 11
           pin: 1
@@ -1997,7 +2221,7 @@ scm:
           ID: 30
           pin: 2
         obj2:
-          ID: 122
+          ID: 42
           pin: 1
   TD:
     Expressions:

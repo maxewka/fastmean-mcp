@@ -1,6 +1,6 @@
 """Read and author FASTMEAN 5.x text SCM files without starting FASTMEAN.
 
-Creation supports R/C/L/U, fixed native diode and controlled-source primitives,
+Creation supports R/C/L/U/I, fixed native diode and controlled-source primitives,
 and named native subcircuit instances. Names used by the native analysis engine
 are ASCII identifiers. Existing UTF-8 and Windows-1251 diagrams, including
 Russian labels, can be read without rewriting.
@@ -32,8 +32,8 @@ KINDS = {value: key for key, value in TYPE_IDS.items()}
 PIN_COUNTS = {1000: 2, 1001: 2, 1002: 2, 2010: 2, 3010: 2,
               1101: 2, 6000: 4, 6001: 4, 6002: 4,
               200: 1, 300: 4, 400: 1, 900: 0}
-CREATE_KINDS = frozenset({"R", "C", "L", "U", "D", "G", "E", "F", "X"})
-EDIT_KINDS = frozenset({"R", "C", "L", "U"})
+CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "X"})
+EDIT_KINDS = frozenset({"R", "C", "L", "U", "I"})
 _SIDES = ("Left", "Top", "Right", "Bottom")
 _KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X"}
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -320,20 +320,21 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
         if kind in {"R", "C", "L"}:
             item["nodes"] = native_nodes
             item["value"] = params.get(kind)
-        elif kind == "U":
-            item["nodes"] = list(reversed(native_nodes))  # public: positive, negative
+        elif kind in {"U", "I"}:
+            current = kind == "I"
+            item["nodes"] = native_nodes if current else list(reversed(native_nodes))
+            if current:
+                item["polarity"] = "positive_current_from_node1_to_node2"
+                # Retain the legacy R/C/L/U-only symbolic/relayout guard.
+                unsupported.add(tid)
             mode = params.get("ST")
             active = params.get({1: "DC", 2: "AC", 3: "PULSE"}.get(mode, "")) or {}
-            item["value"] = active.get("UMAX" if mode == 3 else "U0")
-            aliases = {"U0": "amplitude", "F": "frequency", "PHI0": "phase", "Delay": "delay",
-                       "TFR": "rise_time", "UMAX": "high", "UMIN": "low", "K": "duty_percent"}
+            quantity = "I" if current else "U"
+            item["value"] = active.get(quantity + ("MAX" if mode == 3 else "0"))
+            aliases = {quantity+"0": "amplitude", "F": "frequency", "PHI0": "phase", "Delay": "delay",
+                       "TFR": "rise_time", quantity+"MAX": "high", quantity+"MIN": "low", "K": "duty_percent"}
             item["waveform"] = {"kind": {1: "dc", 2: "sine", 3: "pulse"}.get(mode, "unsupported"),
                                 **{public: copy.deepcopy(active[native]) for native, public in aliases.items() if native in active}}
-        elif kind == "I":
-            item["nodes"] = native_nodes
-            item["polarity"] = "native_pin_order_unverified"
-            warnings.append(f"{item['name']}: current-source direction is not validated; native_pin_nodes retain terminal order.")
-            unsupported.add(tid)
         elif kind in {"D", "G", "E", "F", "X"}:
             item["nodes"] = native_nodes
             # This compatibility field is also the R/C/L/U-only relayout guard.
@@ -379,7 +380,7 @@ def read_scheme(path: str | Path) -> dict:
     return _summarize(document, source, encoding)
 
 
-def _source_params(value: float, waveform: dict | None) -> dict:
+def _source_params(value: float, waveform: dict | None, *, current: bool = False) -> dict:
     # Exact parameter groups from bundled Type2010 U sources. ST 1/2/3 are the
     # observed DC / sinusoidal / pulse modes in bundled examples.
     params = {"ST": 1, "DC": {"U0": value, "Delay": 0, "TFR": "1n"},
@@ -388,8 +389,15 @@ def _source_params(value: float, waveform: dict | None) -> dict:
               "TRIANG": {"F": 1000, "K": 50, "UMAX": value, "UMIN": 0, "Delay": 0},
               "USER": {"ScaleT": 1, "ScaleU": 1, "OffsetU": 0, "Delay": 0, "PER": 0, "NP": 1,
                        "U": {"x": [0, .05, .5, .55, 1], "y": [0, 1, 1, 0, 0]}}}
+    def final_parameters():
+        if not current:
+            return params
+        renames = {"U0":"I0", "UMAX":"IMAX", "UMIN":"IMIN", "ScaleU":"ScaleI", "OffsetU":"OffsetI", "U":"I"}
+        def rename(value):
+            return {renames.get(key,key):rename(item) for key,item in value.items()} if isinstance(value,dict) else value
+        return rename(params)
     if waveform is None:
-        return params
+        return final_parameters()
     if not isinstance(waveform, dict):
         raise SchemeError("waveform must be a mapping.")
     kind = str(waveform.get("kind", "dc")).lower()
@@ -413,7 +421,7 @@ def _source_params(value: float, waveform: dict | None) -> dict:
         if native_key == "K" and not 0 < numeric < 100:
             raise SchemeError("duty_percent must be between 0 and 100.")
         target[native_key] = numeric
-    return params
+    return final_parameters()
 
 
 def _object(oid: int, kind: str, name: str, x: int, y: int,
@@ -593,7 +601,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             raise SchemeError("Component kind and type disagree.")
         kind = alternatives[0] if alternatives else ""
         if kind not in CREATE_KINDS:
-            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, D, G/VCCS, E/VCVS, F/CCCS and X. Current-source polarity is not yet validated.")
+            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS and X.")
         name = _identifier(raw.get("name"), "Component name")
         if name.casefold() in names:
             raise SchemeError(f"Duplicate component name: {name}")
@@ -652,11 +660,11 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                     raise SchemeError(f"{name}: passive values must be positive.")
                 item["value"] = value
                 params = {kind: value}
-                if kind == "U":
+                if kind in {"U", "I"}:
                     item["waveform"] = copy.deepcopy(raw.get("waveform"))
-                    params = _source_params(value, item["waveform"])
+                    params = _source_params(value, item["waveform"], current=kind == "I")
                 elif "waveform" in raw:
-                    raise SchemeError(f"{name}: waveform is only valid for voltage sources.")
+                    raise SchemeError(f"{name}: waveform is only valid for independent sources.")
                 if kind in {"C", "L"}:
                     item["initial_condition"] = parse_value(raw.get("initial_condition", 0))
                     params["IC"] = item["initial_condition"]
@@ -704,10 +712,10 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                    interface_pins: dict | None = None) -> dict:
     """Create an electrically connected native SCM from a node-based JSON spec.
 
-    R/C/L/U use two nodes and value. D uses fixed Ron/Roff/Uon parameters;
+    R/C/L/U/I use two nodes and value. D uses fixed Ron/Roff/Uon parameters;
     G/E/F use four native-ordered pins and a numeric gain. X instances map named
     model pins through model_context. U nodes are [positive, negative], with
-    native pins reversed. Ground aliases are 0/gnd/ground. Floating subcircuit
+    native pins reversed. I nodes are [from,to]. Ground aliases are 0/gnd/ground. Floating subcircuit
     definitions retain exactly their declared ports without adding test points.
     Components are physically connected with orthogonal native wires; ports
     represent only declared external interfaces and analysis inputs/outputs.
@@ -803,11 +811,12 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                 ports[name] = name
     from .layout import build_layout
     layout_options = spec.get("layout") or {}
-    if not isinstance(layout_options, dict) or set(layout_options) - {"placements", "nodes", "routes", "ports", "density"}:
-        raise SchemeError("layout supports density, placements, nodes, routes and external ports.")
+    if not isinstance(layout_options, dict) or set(layout_options) - {"placements", "nodes", "routes", "ports", "density", "ground_style"}:
+        raise SchemeError("layout supports density, ground_style, placements, nodes, routes and external ports.")
     layout = build_layout(normalized, ports, options, layout_options.get("placements"),
                           node_positions=layout_options.get("nodes"), routes=layout_options.get("routes"),
                           port_positions=layout_options.get("ports"), density=layout_options.get("density", "compact"),
+                          **({"ground_style":layout_options["ground_style"]} if "ground_style" in layout_options else {}),
                           **({"interface_pins": interface_pins} if interface_pins is not None else {}))
     objects, wires = layout["objects"], layout["wires"]
     if interface_pins is not None:
@@ -890,14 +899,15 @@ def edit_component_values(source_path: str | Path, updates: dict, output_path: s
             obj.setdefault("Params", {})[kind] = value
         else:
             if "waveform" in patch:
-                obj["Params"] = _source_params(value, patch["waveform"])
+                obj["Params"] = _source_params(value, patch["waveform"], current=kind == "I")
             else:
-                obj.setdefault("Params", {}).setdefault("DC", {})["U0"] = value
-                obj["Params"].setdefault("AC", {})["U0"] = value
+                quantity = "I" if kind == "I" else "U"
+                obj.setdefault("Params", {}).setdefault("DC", {})[quantity+"0"] = value
+                obj["Params"].setdefault("AC", {})[quantity+"0"] = value
                 if "PULSE" in obj["Params"]:
-                    obj["Params"]["PULSE"]["UMAX"] = value
+                    obj["Params"]["PULSE"][quantity+"MAX"] = value
                 if "TRIANG" in obj["Params"]:
-                    obj["Params"]["TRIANG"]["UMAX"] = value
+                    obj["Params"]["TRIANG"][quantity+"MAX"] = value
     _summarize(document, source, "utf-8")
     destination = _write_document(document, output_path, overwrite)
     result = _summarize(document, destination, "utf-8")

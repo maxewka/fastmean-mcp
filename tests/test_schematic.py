@@ -149,7 +149,7 @@ class SchematicTests(unittest.TestCase):
         spec = example_circuit(); spec["components"][1]["value"] = -1; invalid_specs.append(spec)
         spec = example_circuit(); spec["components"][1]["nodes"] = ["in", "in"]; invalid_specs.append(spec)
         spec = example_circuit(); spec["components"][1]["type"] = "MOS"; spec["components"][1].pop("kind"); invalid_specs.append(spec)
-        spec = example_circuit(); spec["components"][0]["kind"] = "I"; invalid_specs.append(spec)
+        spec = example_circuit(); spec["components"][0]["kind"] = "UNSUPPORTED"; invalid_specs.append(spec)
         spec = example_circuit(); spec["components"][1]["nodes"] = ["IN", "out"]; invalid_specs.append(spec)
         spec = example_circuit(); spec["analysis"]["frequency"]["stop"] = 1; invalid_specs.append(spec)
         spec = example_circuit(); spec["ports"] = {"BAD": "absent"}; invalid_specs.append(spec)

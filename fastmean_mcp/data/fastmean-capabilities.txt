@@ -225,7 +225,7 @@ project requires neither FASTMEAN nor a GUI. Analyses use installed FASTMEAN;
 this does not establish the physical accuracy or ratings of a device model.
 
 fastmean_annotate_circuit adds ROOT numeric .parameter declarations, supported
-R/C/L/U parameter bindings, explanatory native TEXT objects, and selected saved
+R/C/L/U/I parameter bindings, explanatory native TEXT objects, and selected saved
 TD/FD signal expressions in a new portable copy. It preserves original source
 files and privately packages child SCM dependencies. The root's saved native
 analysis sections are retained before requested signals replace active traces.
@@ -262,17 +262,21 @@ For a reference drawing, create spec.layout may contain:
   nodes: {"in":{"x":800,"y":1000}}
   routes: {"in":[[[800,1000],[920,1000],[920,960]]]}
   ports: {"in":{"x":680,"y":1000,"rotation":2}}
-Coordinates are integers on a 20-unit grid. Rotation is clockwise 0..3;
+Explicit coordinates are integers on a native four-unit grid; automatic spacing stays20. Rotation is clockwise 0..3;
 R/C/L pin1 points west/north/east/south respectively. U pin1 is negative.
-Explicit polylines must be orthogonal and connected through their node anchor.
+layout.nodes are routing hints: an unused branch to a seed may be pruned.
+Use exact layout.routes polylines to require a particular physical path.
+Explicit polylines must be orthogonal and connected through their node hint.
 Component overlaps, collinear different-net wires, and ambiguous crossing
 junctions are rejected before SCM output. Plain perpendicular wire crossings
 are unconnected. Review labels and overall appearance after generation; this
 router does not guarantee a perfect arbitrary graph or reference-image clone.
 Density changes automatic spacing only: explicit placements, nodes, routes and
-port coordinates stay unchanged. It keeps the native symbols and 20-unit grid.
+port coordinates stay unchanged. It keeps native symbols and the default20-unit placement spacing.
 Relayout accepts density="compact" or "standard" and always creates a copy.
-Long text labels still need visual review; symbol checks do not measure text.
+Primitive caption bounds are measured for routing clearance. Later annotation
+can lengthen value labels; use concise parameter identifiers and inspect the
+annotated preview. Explicit routes can intentionally override label clearance.
 The attributed Point75A example contains 25 published RLC elements plus one
 source and three resistive test loads, with explicit compact reference layout.
 
@@ -293,3 +297,37 @@ and artifact MCP resources expose registered outputs only. Cancellation stops
 only the adapter's own calculation processes. Existing GUI windows are left
 open. No Windows locale, security setting or proprietary binary is modified.
 Portable tests and opt-in native integration tests are included in tests/.
+
+Adapter additions (version 1.2.0)
+--------------------------------
+Independent current sources use kind I, native Type3010, nodes[from,to], and
+positive current flowing from the first node to the second. They support the
+same DC/sine/pulse waveform options as U sources, amplitude editing and root
+.parameter bindings. A native check of I=[0,out],1mA with R=1kohm gives +1V;
+reversing I gives -1V. This does not extend CIRSYM or legacy relayout support.
+
+Routing uses exact native pin axes and soft automatic node hubs, with expensive
+bends/crossings. Degree-two CON removal preserves the supported native path;
+branches remain visible. R/C/L/U/I/D/G/E/F preview captions have shared text clearance.
+This caption layout is our engineering preview, not verified native text
+placement. Explicit routes remain authoritative. Fixed geometry can still
+require detours or force a label overlap; inspect every important schematic.
+Set layout.ground_style=local for separate true node0 ground symbols, one per
+grounded component pin; default rail keeps a physical common return. Local
+ground placement fails if obstructed. Explicit node0 routes and local mode
+cannot be combined. Fine four-unit explicit positions permit control/source
+pins offset16/8 to align with adjacent component columns.
+
+fastmean_plot accepts an existing registered, completed AC/transient run_id,
+panels[{signal,label?,unit?,scale?,metrics?,guides?,color?}], display_window,
+measurement_window, title, subtitle and x_unit. Signals must match original
+exported CSV columns exactly. It returns MCP ImageContent, PNG/SVG, chart spec,
+measurements and source hashes; no native process runs. Original SI windows
+remain seconds/Hz even when labels use ms/kHz. Transient RMS/mean use exact
+interpolated window endpoints and trapezoids on the original adaptive samples,
+before display decimation. AC supports display windows but not time metrics.
+See docs/PLOTTING.md for complete examples and numerical limitations.
+
+fastmean_preview(include_text=false) can omit TEXT notes from an image and its
+fit bounds. Omitted counts are reported; original SCM and parameter expressions
+are retained. Default previews include all notes.

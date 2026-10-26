@@ -104,13 +104,13 @@ def _validated_request(document: dict, parameters: Any, bindings: Any, descripti
             raise SchemeError(f"Binding {name!r} must refer to a parameter declared in this request.")
         obj = names[name][0]
         tid, params = obj["Type"], obj.get("Params") or {}
-        if tid not in {1000, 1001, 1002, 2010}:
-            raise SchemeError(f"Binding {name!r} supports only root R/C/L and DC/sine voltage-source amplitude.")
+        if tid not in {1000, 1001, 1002, 2010,3010}:
+            raise SchemeError(f"Binding {name!r} supports only root R/C/L and DC/sine independent-source amplitude.")
         if tid in {1000, 1001, 1002} and numeric[parameter] <= 0:
             raise SchemeError(f"Passive binding {name!r} requires a positive parameter value.")
-        if tid == 2010 and (params.get("ST") not in {1, 2} or
+        if tid in {2010,3010} and (params.get("ST") not in {1, 2} or
                             not isinstance(params.get({1: "DC", 2: "AC"}.get(params.get("ST"))), dict)):
-            raise SchemeError(f"Voltage binding {name!r} requires a complete DC or sine waveform.")
+            raise SchemeError(f"Source binding {name!r} requires a complete DC or sine waveform.")
         normalized[name] = parameter
     if descriptions is None:
         descriptions = []
@@ -148,7 +148,7 @@ def _text_objects(document: dict, parameters: dict, descriptions: list[str], bin
     for obj in objects:
         parameter = bindings.get(obj.get("Name"))
         if parameter is not None:
-            units.setdefault(parameter, set()).add({1000: "ohm", 1001: "F", 1002: "H", 2010: "V"}[obj["Type"]])
+            units.setdefault(parameter, set()).add({1000: "ohm", 1001: "F", 1002: "H", 2010: "V",3010:"A"}[obj["Type"]])
 
     def declaration(name: str, value: float) -> str:
         choices = units.get(name, set())
@@ -302,7 +302,7 @@ def annotate_circuit(source_path: str | Path, output_path: str | Path,
                     if obj["Type"] in {1000, 1001, 1002}:
                         params[{1000: "R", 1001: "C", 1002: "L"}[obj["Type"]]] = parameter
                     else:
-                        params[{1: "DC", 2: "AC"}[params["ST"]]]["U0"] = parameter
+                        params[{1: "DC", 2: "AC"}[params["ST"]]]["I0" if obj["Type"]==3010 else "U0"] = parameter
                 texts = _text_objects(document, numeric, notes, normalized)
                 for section, signals in requested.items():
                     settings = body.setdefault(section, {})

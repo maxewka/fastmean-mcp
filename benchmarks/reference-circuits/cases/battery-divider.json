@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "id": "battery-divider",
+  "title": "Battery divider with three terminals",
+  "source": {
+    "repo": "jitendra-bhandari/Masala-CHAI",
+    "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+    "path": "Dataset/data_5/6.JPG",
+    "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/6.JPG",
+    "image_sha256": "7D7C3C8EB299DD03156F782CA5FEE9B529B15897D613C5CA7B04C9DDE8169A5C"
+  },
+  "value_provenance": {
+    "printed_values": {
+      "battery_V": 1.5,
+      "Rtop": 1000,
+      "Rbottom": 1000
+    },
+    "benchmark_values_SI": {
+      "battery_V": 1.5,
+      "Rtop": 1000,
+      "Rbottom": 1000
+    },
+    "explanation": "All numbers printed in source. Outputs independently derived, not original solver exports. Circular U source instead of battery is a disclosed visual mismatch.",
+    "source_component_names": "Reference symbolic labels are retained where practical; U1 and ordinal passive names are our identifiers.",
+    "component_values": {
+      "U1": {
+        "value_SI": 1.5,
+        "origin": "printed_in_reference"
+      },
+      "R1": {
+        "value_SI": 1000,
+        "origin": "printed_in_reference"
+      },
+      "R2": {
+        "value_SI": 1000,
+        "origin": "printed_in_reference"
+      }
+    },
+    "source_waveform": "Assigned 1 kHz sine stimulus for native AC. For DC/step checks use an MCP edit_values copy with the same source value and waveform kind dc."
+  },
+  "limitations": [
+    "No original schematic pixels or original numerical solver outputs are bundled.",
+    "Source images contain textbook-derived drawings; image redistribution clearance is unestablished.",
+    "Placement coordinates are logical hand transcriptions on a 20-unit grid, not extracted original pixel coordinates.",
+    "Saved/native source-current sign must be verified independently; physical current directions below define the oracle.",
+    "Reference omits an explicit ground glyph; an analysis ground is added at its lower common return.",
+    "Reference battery is transcribed as circular ideal DC voltage source U1; disclose this glyph mismatch until battery glyph support exists.",
+    "Reference terminal labels 1/2/3 map to in/out/ground; native ground is not exposed as a named port."
+  ],
+  "required_kinds": [
+    "R",
+    "U"
+  ],
+  "circuit_spec": {
+    "title": "Battery divider with three terminals",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 1.5,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "R",
+        "name": "R1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 1000
+      },
+      {
+        "kind": "R",
+        "name": "R2",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 1000
+      }
+    ],
+    "ports": [
+      "in",
+      "out"
+    ],
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-05
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 100000,
+        "points": 101
+      }
+    },
+    "layout": {
+      "density": "compact",
+      "placements": {
+        "U1": {
+          "x": 600,
+          "y": 1000,
+          "rotation": 3
+        },
+        "R1": {
+          "x": 1000,
+          "y": 900,
+          "rotation": 1
+        },
+        "R2": {
+          "x": 1000,
+          "y": 1140,
+          "rotation": 1
+        }
+      },
+      "ports": {
+        "in": {
+          "x": 1240,
+          "y": 840,
+          "rotation": 0
+        },
+        "out": {
+          "x": 1240,
+          "y": 1020,
+          "rotation": 0
+        }
+      }
+    }
+  },
+  "automatic_circuit_spec": {
+    "title": "Battery divider with three terminals",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 1.5,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "R",
+        "name": "R1",
+        "nodes": [
+          "in",
+          "out"
+        ],
+        "value": 1000
+      },
+      {
+        "kind": "R",
+        "name": "R2",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 1000
+      }
+    ],
+    "ports": [
+      "in",
+      "out"
+    ],
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-05
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 100000,
+        "points": 101
+      }
+    },
+    "layout": {
+      "density": "compact"
+    }
+  },
+  "expected": {
+    "provenance": "Independent analytical expectations for the declared fixture; not FASTMEAN output and not original textbook answer data.",
+    "s_definition": "s=j*2*pi*f",
+    "frequency_sampling": "Use the spec frequency range with logarithmic spacing; insert analytic checkpoints explicitly if they are absent from the sampled grid.",
+    "dc": {
+      "node_voltages_V": {
+        "in": 1.5,
+        "out": 0.75
+      },
+      "physical_currents_A": [
+        {
+          "component": "R1",
+          "from": "in",
+          "to": "out",
+          "value": 0.00075
+        },
+        {
+          "component": "R2",
+          "from": "out",
+          "to": "0",
+          "value": 0.00075
+        }
+      ]
+    },
+    "ac": {
+      "H": "R2/(R1+R2)",
+      "gain_unit": "V/V",
+      "constant_gain": 0.5,
+      "output_magnitude_V": 0.75,
+      "phase_deg": 0
+    },
+    "transient": {
+      "output": "out",
+      "settled_value_V": 0.75,
+      "comment": "Purely resistive; compare after source rise time.",
+      "source_preparation": "MCP edit_values: preserve source amplitude value and set waveform={kind:dc} on a new copy."
+    }
+  },
+  "visual_goals": {
+    "reference_description": "Battery left; two resistors vertically stacked in right column; terminal labels 1/2/3 at top/middle/bottom. Top battery plate is positive. Add one analysis ground on bottom return because reference lacks ground glyph.",
+    "hard_gates": [
+      "No component or label collisions.",
+      "No accidental junctions, disconnected terminals or diagonal routes.",
+      "Real wires join adjacent primitives; ports identify external measurement nodes only.",
+      "Match reference branch orientation and relative component order.",
+      "Review reference-guided and automatic variants separately."
+    ],
+    "reference_guided_status": "Created through MCP and visually reviewed; see validation-report.json for numerical runs, geometry refreshes and remaining glyph differences.",
+    "automatic_status": "Created through MCP and visually reviewed. No per-case coordinates; rail/local ground style is retained. Arrangement differences are documented in validation-report.json."
+  }
+}

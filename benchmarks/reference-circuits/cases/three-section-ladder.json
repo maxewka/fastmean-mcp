@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "id": "three-section-ladder",
+  "title": "Three-section resistive ladder",
+  "source": {
+    "repo": "jitendra-bhandari/Masala-CHAI",
+    "pinned_commit": "7478979675be02c61f22a137ecde64b0eadc0232",
+    "path": "Dataset/data_5/7.JPG",
+    "url": "https://github.com/jitendra-bhandari/Masala-CHAI/blob/7478979675be02c61f22a137ecde64b0eadc0232/Dataset/data_5/7.JPG",
+    "image_sha256": "C82370DDF02C56CD1D7B8456392D90F1E099147AE9495E64D00E10BC1810FF2B"
+  },
+  "value_provenance": {
+    "printed_values": {
+      "battery_V": 10,
+      "all_six_R_ohm": 20000
+    },
+    "benchmark_values_SI": {
+      "battery_V": 10,
+      "all_six_R_ohm": 20000
+    },
+    "explanation": "All numbers printed in source; exact independent KCL oracle. Circular U source instead of battery is a disclosed visual mismatch.",
+    "source_component_names": "Reference symbolic labels are retained where practical; U1 and ordinal passive names are our identifiers.",
+    "component_values": {
+      "U1": {
+        "value_SI": 10,
+        "origin": "printed_in_reference"
+      },
+      "R12": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      },
+      "R23": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      },
+      "R34": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      },
+      "R2g": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      },
+      "R3g": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      },
+      "R4g": {
+        "value_SI": 20000,
+        "origin": "printed_in_reference"
+      }
+    },
+    "source_waveform": "Assigned 1 kHz sine stimulus for native AC. For DC/step checks use an MCP edit_values copy with the same source value and waveform kind dc."
+  },
+  "limitations": [
+    "No original schematic pixels or original numerical solver outputs are bundled.",
+    "Source images contain textbook-derived drawings; image redistribution clearance is unestablished.",
+    "Placement coordinates are logical hand transcriptions on a 20-unit grid, not extracted original pixel coordinates.",
+    "Saved/native source-current sign must be verified independently; physical current directions below define the oracle.",
+    "Reference battery is transcribed as circular ideal DC voltage source U1; disclose this glyph mismatch until battery glyph support exists.",
+    "Reference local ground glyphs are represented by layout.ground_style=local, with no physical bottom return rail.",
+    "Reference terminal labels 1/2/3/4 map to in/tap2/tap3/out; named analysis ports may introduce short marker leads."
+  ],
+  "required_kinds": [
+    "R",
+    "U"
+  ],
+  "circuit_spec": {
+    "title": "Three-section resistive ladder",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 10,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "R",
+        "name": "R12",
+        "nodes": [
+          "in",
+          "n2"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R23",
+        "nodes": [
+          "n2",
+          "n3"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R34",
+        "nodes": [
+          "n3",
+          "out"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R2g",
+        "nodes": [
+          "n2",
+          "0"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R3g",
+        "nodes": [
+          "n3",
+          "0"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R4g",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 20000
+      }
+    ],
+    "ports": {
+      "in": "in",
+      "tap2": "n2",
+      "tap3": "n3",
+      "out": "out"
+    },
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-05
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 100000,
+        "points": 101
+      }
+    },
+    "layout": {
+      "density": "compact",
+      "placements": {
+        "U1": {
+          "x": 600,
+          "y": 1000,
+          "rotation": 3
+        },
+        "R12": {
+          "x": 840,
+          "y": 800,
+          "rotation": 0
+        },
+        "R23": {
+          "x": 1160,
+          "y": 800,
+          "rotation": 0
+        },
+        "R34": {
+          "x": 1480,
+          "y": 800,
+          "rotation": 0
+        },
+        "R2g": {
+          "x": 1000,
+          "y": 1040,
+          "rotation": 1
+        },
+        "R3g": {
+          "x": 1320,
+          "y": 1040,
+          "rotation": 1
+        },
+        "R4g": {
+          "x": 1640,
+          "y": 1040,
+          "rotation": 1
+        }
+      },
+      "ports": {
+        "in": {
+          "x": 600,
+          "y": 680,
+          "rotation": 3
+        },
+        "tap2": {
+          "x": 1000,
+          "y": 680,
+          "rotation": 3
+        },
+        "tap3": {
+          "x": 1320,
+          "y": 680,
+          "rotation": 3
+        },
+        "out": {
+          "x": 1800,
+          "y": 800,
+          "rotation": 0
+        }
+      },
+      "ground_style": "local"
+    }
+  },
+  "automatic_circuit_spec": {
+    "title": "Three-section resistive ladder",
+    "description": "Original circuit transcription for reference-layout benchmarking; numerical provenance is recorded in case metadata.",
+    "components": [
+      {
+        "kind": "U",
+        "name": "U1",
+        "nodes": [
+          "in",
+          "0"
+        ],
+        "value": 10,
+        "waveform": {
+          "kind": "sine",
+          "frequency": 1000
+        }
+      },
+      {
+        "kind": "R",
+        "name": "R12",
+        "nodes": [
+          "in",
+          "n2"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R23",
+        "nodes": [
+          "n2",
+          "n3"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R34",
+        "nodes": [
+          "n3",
+          "out"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R2g",
+        "nodes": [
+          "n2",
+          "0"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R3g",
+        "nodes": [
+          "n3",
+          "0"
+        ],
+        "value": 20000
+      },
+      {
+        "kind": "R",
+        "name": "R4g",
+        "nodes": [
+          "out",
+          "0"
+        ],
+        "value": 20000
+      }
+    ],
+    "ports": {
+      "in": "in",
+      "tap2": "n2",
+      "tap3": "n3",
+      "out": "out"
+    },
+    "analysis": {
+      "input": "in",
+      "output": "out",
+      "transient": {
+        "stop": 0.002,
+        "step": 1e-05
+      },
+      "frequency": {
+        "start": 10,
+        "stop": 100000,
+        "points": 101
+      }
+    },
+    "layout": {
+      "density": "compact",
+      "ground_style": "local"
+    }
+  },
+  "expected": {
+    "provenance": "Independent analytical expectations for the declared fixture; not FASTMEAN output and not original textbook answer data.",
+    "s_definition": "s=j*2*pi*f",
+    "frequency_sampling": "Use the spec frequency range with logarithmic spacing; insert analytic checkpoints explicitly if they are absent from the sampled grid.",
+    "dc": {
+      "node_voltages_V": {
+        "in": 10,
+        "tap2": 3.8461538461538463,
+        "tap3": 1.5384615384615385,
+        "out": 0.7692307692307693
+      },
+      "exact_node_voltages_V": {
+        "tap2": "50/13",
+        "tap3": "20/13",
+        "out": "10/13"
+      },
+      "source_delivered_current_A": 0.0003076923076923077,
+      "kcl": "3*V2-V3=Vin; -V2+3*V3-V4=0; -V3+2*V4=0"
+    },
+    "ac": {
+      "gain_unit": "V/V",
+      "output_gains": {
+        "tap2": 0.38461538461538464,
+        "tap3": 0.15384615384615385,
+        "out": 0.07692307692307693
+      },
+      "exact_output_gains": {
+        "tap2": "5/13",
+        "tap3": "2/13",
+        "out": "1/13"
+      },
+      "phase_deg": 0
+    },
+    "transient": {
+      "output": "out",
+      "settled_value_V": 0.7692307692307693,
+      "comment": "Purely resistive; compare after source rise time.",
+      "source_preparation": "MCP edit_values: preserve source amplitude value and set waveform={kind:dc} on a new copy."
+    }
+  },
+  "visual_goals": {
+    "reference_description": "Battery left; three horizontal series resistors on straight top signal path; three vertical shunts aligned below nodes 2/3/4, each with ground. Labels 1/2/3/4 on upper rail, balanced spacing, no crossings.",
+    "hard_gates": [
+      "No component or label collisions.",
+      "No accidental junctions, disconnected terminals or diagonal routes.",
+      "Real wires join adjacent primitives; ports identify external measurement nodes only.",
+      "Match reference branch orientation and relative component order.",
+      "Review reference-guided and automatic variants separately."
+    ],
+    "reference_guided_status": "Created through MCP and visually reviewed; see validation-report.json for numerical runs, geometry refreshes and remaining glyph differences.",
+    "automatic_status": "Created through MCP and visually reviewed. No per-case coordinates; rail/local ground style is retained. Arrangement differences are documented in validation-report.json."
+  }
+}

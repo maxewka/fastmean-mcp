@@ -53,6 +53,22 @@ class PreviewTests(unittest.TestCase):
         self.assertNotEqual(first["svg_path"], second["svg_path"])
         self.assertEqual(hashlib.sha256(png.read_bytes()).hexdigest(), digest)
 
+    def test_note_free_preview_reports_omission_and_preserves_source(self):
+        data = yaml.safe_load(self.source.read_text(encoding="utf-8"))
+        data["scm"]["Scheme"]["Objects"].append({"ID": 9999, "Type": 900,
+            "Name": "NOTE", "X": 2000, "Y": 4000, "Rot": 0,
+            "Params": {"Text": "EXPLANATION_TO_KEEP_IN_SCM"}})
+        self.rewrite(data)
+        before = self.source.read_bytes()
+        shown = render_schematic(self.source, self.root / "previews")
+        hidden = render_schematic(self.source, self.root / "previews", include_text=False)
+        self.assertIn("EXPLANATION_TO_KEEP_IN_SCM", Path(shown["svg_path"]).read_text(encoding="utf-8"))
+        self.assertNotIn("EXPLANATION_TO_KEEP_IN_SCM", Path(hidden["svg_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(hidden["omitted_text_objects"], 1)
+        self.assertFalse(hidden["text_objects_included"])
+        self.assertEqual(hidden["wire_count"], shown["wire_count"])
+        self.assertEqual(self.source.read_bytes(), before)
+
     def test_unsupported_model_is_rejected_before_output_creation(self):
         data = yaml.safe_load(self.source.read_text(encoding="utf-8"))
         data["scm"]["Scheme"]["Objects"].append({"ID": 9999, "Type": 6615,

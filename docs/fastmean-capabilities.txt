@@ -90,6 +90,11 @@ table of floating-point numbers, one calculation point per row. The manual does
 not specify a CSV delimiter, column header format or numeric output precision;
 the MCP must inspect actual output instead of assuming comma-separated CSV.
 
+The MCP tool fastmean_export_netlist uses native save_netlist on a sanitized
+recursive working copy, returns bounded text plus the full netlist/manifest
+artifacts and requests no AC or transient analysis. timeout is per request,
+between 1 and 60 seconds; cancellation terminates only its owned worker.
+
 write after applies globally to all write directives and filters times before
 the specified threshold. Only one such directive should exist per circuit.
 The caller is responsible for unique output filenames across write directives.
@@ -172,7 +177,7 @@ graph-number edits1163..1169; OK1, Cancel2.
 Graph string resource IDs127/128 are Save data/Copy hints; dispatch semantics
 were not tested and should not be assumed from the string IDs alone.
 
-Adapter authoring and batch behavior (version 1.0.1)
+Adapter authoring and batch behavior
 ---------------------------------------------------
 New circuits support R/C/L and independent U/V sources. U nodes are [positive,
 negative]. Engineering values are converted to numeric SI. Ground is node 0.
@@ -180,22 +185,98 @@ Components need kind/type, name, nodes[2] and value. ports maps an ASCII alias t
 a graph node, or lists aliases equal to node names. Numeric graph node labels
 need named external aliases: ports={"IN":"17","OUT":"31"}; analysis uses IN/OUT.
 
-Default layout uses adjacent components, physical wires and native CON corners
-and junctions. External/analysis ports occur once per alias. Use relayout to
-convert former port-stub diagrams, preview to inspect PNG/SVG, then open to view
-the actual native application. Preview is an MCP rendering, not a screenshot.
+Fixed native primitives also support D/1101 with numeric parameters Ron, Roff,
+Uon; G/VCCS/6000 with g; E/VCVS/6001 with k; F/CCCS/6002 with h. Controlled
+sources use four nodes in exact native pin order and a finite numeric value
+(or their single named parameter). Diodes require 0 < Ron <= Roff and Uon >= 0.
+These fields come from native saved records; they are not an arbitrary SPICE
+model interface. The symbolic and relayout adapters remain R/C/L/U only.
+
+fastmean_create_project authors native Type-7100 X hierarchies. Input is
+{models:{MODEL:{pins:{Left:["B"],Top:["C"],Right:[],Bottom:["E"]},
+circuit:{components:[...],ports:{B:"b",C:"c",E:"e"}}}},circuit:{...}}.
+An instance is {kind:"X",name:"Q1",model:"MODEL",
+connections:{B:"base",C:"collector",E:"0"}}. Native pins are numbered through
+Left, Top, Right, Bottom, preserving list order. Definitions may float; exposed
+ports must match pin names exactly. Every instance maps every pin. Model names
+and external pins are case-unambiguous ASCII identifiers; underscore-prefixed
+or numeric external pins are not generated. Native underscore-prefixed test
+components are preserved with a warning that parent expansion excludes them.
+There are at most 99 definitions and 32 exposed pins per definition. Missing
+models, recursive cycles, path traversal and instance parameters are rejected.
+
+Native 6.1 rebuilds a model's external interface from child PORT orientation
+and coordinates, not merely the cached parent Pins labels or object-list order.
+The compiler therefore positions and validates definition PORTs on their
+declared sides: Left Rot2 sorted by Y, Top Rot3 sorted by X, Right Rot0 sorted
+by Y, Bottom Rot1 sorted by X. Manual positions must preserve this order and
+use distinct ordering coordinates. This prevents silent terminal swaps in
+asymmetric models. Generated Type-7100 geometry requires default caption/pin
+fonts, General.Scale100 and model FileName captions at most20 ASCII characters.
+
+Projects are created atomically in new directories and use relative SCM model
+references. Outputs include main.scm, models/*.scm, project.spec.json,
+per-circuit JSON specifications, SHA256 hashes and project.manifest.json.
+Read the published project.spec.json, modify its definitions/root circuit and
+call create_project again to rebuild an edited copy. Earlier files are kept.
+The initial API supports fixed numeric definitions only, without generated
+.parameter directives or native Scm/Actual parameter overrides. Creating a
+project requires neither FASTMEAN nor a GUI. Analyses use installed FASTMEAN;
+this does not establish the physical accuracy or ratings of a device model.
+
+fastmean_annotate_circuit adds ROOT numeric .parameter declarations, supported
+R/C/L/U/I parameter bindings, explanatory native TEXT objects, and selected saved
+TD/FD signal expressions in a new portable copy. It preserves original source
+files and privately packages child SCM dependencies. The root's saved native
+analysis sections are retained before requested signals replace active traces.
+parameters maps ASCII names to finite numeric/SI values; bindings maps existing
+root component names to validated parameter expressions. descriptions is a list
+of plain explanation strings; td_signals/fd_signals contain mathematical
+expressions such as U(OUT), I(RL), db(U(OUT)/U(IN)), phs(U(OUT)/U(IN)). There are
+no generated parameter overrides for X instances. This authoring tool performs
+no calculation, GUI launch or desktop automation; analysis sanitizes its own
+private working copy again before native execution.
+
+Private analysis and explicit-open copies recursively snapshot all validated
+local SCM models relative to each containing source file, reject cycles and
+unvalidated external model/data fields, and retain original/private hashes.
+References inside native jobs point to private ASCII paths. open performs no
+analysis, leaves its GUI process for the user and does not automate the desktop.
+
+Default layout uses compact spacing and physical wires. Redundant degree-two
+CON corners are removed only when endpoint-derived native bends reproduce the
+same path. Branch junctions and necessary routing waypoints remain visible.
+External/analysis ports occur once per alias. Use relayout to convert former
+port-stub diagrams and preview to inspect PNG/SVG. Deliver the portable SCM
+and models; open the application only if explicitly requested by the user.
+Preview is an MCP rendering, not a screenshot. No desktop control is needed.
+
+The standard stdio server also works with Claude Code/Desktop, Kimi CLI and
+DeepSeek through Cline. Export local client JSON with
+python -m fastmean_mcp.client_config --client <profile> --app-dir <app>
+--output-dir <results>. No model credentials or client-specific model SDKs
+belong in this MCP server. See docs/ai-clients.md for setup and test boundaries.
 For a reference drawing, create spec.layout may contain:
+  density: "compact"  # default; "standard" restores the previous spacing
   placements: {"R1":{"x":1000,"y":1000,"rotation":0}}
   nodes: {"in":{"x":800,"y":1000}}
   routes: {"in":[[[800,1000],[920,1000],[920,960]]]}
   ports: {"in":{"x":680,"y":1000,"rotation":2}}
-Coordinates are integers on a 20-unit grid. Rotation is clockwise 0..3;
+Explicit coordinates are integers on a native four-unit grid; automatic spacing stays20. Rotation is clockwise 0..3;
 R/C/L pin1 points west/north/east/south respectively. U pin1 is negative.
-Explicit polylines must be orthogonal and connected through their node anchor.
+layout.nodes are routing hints: an unused branch to a seed may be pruned.
+Use exact layout.routes polylines to require a particular physical path.
+Explicit polylines must be orthogonal and connected through their node hint.
 Component overlaps, collinear different-net wires, and ambiguous crossing
 junctions are rejected before SCM output. Plain perpendicular wire crossings
 are unconnected. Review labels and overall appearance after generation; this
 router does not guarantee a perfect arbitrary graph or reference-image clone.
+Density changes automatic spacing only: explicit placements, nodes, routes and
+port coordinates stay unchanged. It keeps native symbols and the default20-unit placement spacing.
+Relayout accepts density="compact" or "standard" and always creates a copy.
+Primitive caption bounds are measured for routing clearance. Later annotation
+can lengthen value labels; use concise parameter identifiers and inspect the
+annotated preview. Explicit routes can intentionally override label clearance.
 The attributed Point75A example contains 25 published RLC elements plus one
 source and three resistive test loads, with explicit compact reference layout.
 
@@ -203,6 +284,8 @@ AC sampling is explicitly log or linear. Omitted signals use only active saved
 traces with the expected f/t x axis; disabled stale rows are excluded. Custom
 saved XY plots require explicit signals for both expressions. Batch charts use
 frequency/time on the x axis; data can be retrieved separately for XY plotting.
+Transient timeout is per request, 1–60 seconds, with default60; cancellation
+and timeout stop only the native worker owned by that request.
 In a native batch check, a saved definition p=i*2*PI*f produced no requested
 complex columns. An explicitly chosen working-copy variant using
 p=sqrt(-1)*2*PI*f matched an independent complex oracle. The adapter does not
@@ -214,3 +297,37 @@ and artifact MCP resources expose registered outputs only. Cancellation stops
 only the adapter's own calculation processes. Existing GUI windows are left
 open. No Windows locale, security setting or proprietary binary is modified.
 Portable tests and opt-in native integration tests are included in tests/.
+
+Adapter additions (version 1.2.0)
+--------------------------------
+Independent current sources use kind I, native Type3010, nodes[from,to], and
+positive current flowing from the first node to the second. They support the
+same DC/sine/pulse waveform options as U sources, amplitude editing and root
+.parameter bindings. A native check of I=[0,out],1mA with R=1kohm gives +1V;
+reversing I gives -1V. This does not extend CIRSYM or legacy relayout support.
+
+Routing uses exact native pin axes and soft automatic node hubs, with expensive
+bends/crossings. Degree-two CON removal preserves the supported native path;
+branches remain visible. R/C/L/U/I/D/G/E/F preview captions have shared text clearance.
+This caption layout is our engineering preview, not verified native text
+placement. Explicit routes remain authoritative. Fixed geometry can still
+require detours or force a label overlap; inspect every important schematic.
+Set layout.ground_style=local for separate true node0 ground symbols, one per
+grounded component pin; default rail keeps a physical common return. Local
+ground placement fails if obstructed. Explicit node0 routes and local mode
+cannot be combined. Fine four-unit explicit positions permit control/source
+pins offset16/8 to align with adjacent component columns.
+
+fastmean_plot accepts an existing registered, completed AC/transient run_id,
+panels[{signal,label?,unit?,scale?,metrics?,guides?,color?}], display_window,
+measurement_window, title, subtitle and x_unit. Signals must match original
+exported CSV columns exactly. It returns MCP ImageContent, PNG/SVG, chart spec,
+measurements and source hashes; no native process runs. Original SI windows
+remain seconds/Hz even when labels use ms/kHz. Transient RMS/mean use exact
+interpolated window endpoints and trapezoids on the original adaptive samples,
+before display decimation. AC supports display windows but not time metrics.
+See docs/PLOTTING.md for complete examples and numerical limitations.
+
+fastmean_preview(include_text=false) can omit TEXT notes from an image and its
+fit bounds. Omitted counts are reported; original SCM and parameter expressions
+are retained. Default previews include all notes.
