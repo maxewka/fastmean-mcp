@@ -21,7 +21,7 @@ jobs:
       PYTHONUTF8: "1"
       MPLBACKEND: Agg
       # An absent installation makes native tests skip honestly.
-      FASTMEAN_APP_DIR: ${{ runner.temp }}/fastmean-not-installed
+      FASTMEAN_APP_DIR: fastmean-ci-intentionally-missing
       FASTMEAN_MCP_NATIVE_TEST: "0"
       FASTMEAN_RELAYOUT_NATIVE: "0"
     steps:
