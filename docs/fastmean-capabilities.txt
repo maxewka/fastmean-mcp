@@ -178,296 +178,215 @@ graph-number edits1163..1169; OK1, Cancel2.
 Graph string resource IDs127/128 are Save data/Copy hints; dispatch semantics
 were not tested and should not be assumed from the string IDs alone.
 
-Adapter authoring and batch behavior
----------------------------------------------------
-New circuits support R/C/L and independent U/V sources. U nodes are [positive,
-negative]. Engineering values are converted to numeric SI. Ground is node 0.
-Components need kind/type, name, nodes[2] and value. ports maps an ASCII alias to
-a graph node, or lists aliases equal to node names. Numeric graph node labels
-need named external aliases: ports={"IN":"17","OUT":"31"}; analysis uses IN/OUT.
+Adapter contract (version 1.6.0)
+---------------------------------
+This stdio server exposes 29 tools. It creates/edits native YAML SCM projects,
+uses the separately installed FASTMEAN/CIRSYM engines, and returns registered
+files and MCP images without desktop automation. Deliver the complete returned
+project folder; opening a GUI is an explicit fastmean_open action only.
 
-Fixed native primitives also support D/1101 with numeric parameters Ron, Roff,
-Uon; G/VCCS/6000 with g; E/VCVS/6001 with k; F/CCCS/6002 with h. Controlled
-sources use four nodes in exact native pin order and a finite numeric value
-(or their single named parameter). Diodes require 0 < Ron <= Roff and Uon >= 0.
-These fields come from native saved records; they are not an arbitrary SPICE
-model interface. The symbolic and relayout adapters remain R/C/L/U only.
+Catalog and authoring
+---------------------
+Call fastmean_catalog(query="TR3",detail=true) before using an unfamiliar kind.
+The catalog inventories 56 accepted native factory TypeIDs in FASTMEAN6.1:
+44 ordinary electrical classes, 6 service classes, 2 internal auxiliary sources
+and 4 legacy source aliases. These categories are not interchangeable.
+All 44 ordinary classes are supported for authoring/native numerical use:
+R,C,L,UNISTOR,NLC,NLL,NLR,D,FSW,U,I,G,E,F,H,GYR,TR,TR3,TUBE,NMOS_SMALL,NPN,
+OPAMP,OPAMP_SAT,PWM,PAM1,PAM2,BALMOD,SW,THYRISTOR,MOSFET,LINE,BRIDGE,RS,DFF,
+JK,RSCLK,NOT,AND,OR,XOR,LATCH,COMP,SUM,X.
+X uses create_project and validated portable model definitions. Numerical
+operational coverage, quantitative oracles and static geometry are separate
+catalog evidence; inclusion is not calibration of every physical model.
 
-OPAMP / operational amplifier / операционный усилитель: native Type 6400,
-three nodes [noninverting,inverting,output], finite numeric value=k or
-parameters={k}. V(output,0)=k*(V(noninverting)-V(inverting)); output reference
-is global node 0. Native ideal model: no supply pins, clipping, bandwidth,
-slew rate, noise or output-current limit; not a commercial amplifier model.
-Exact Rot0 body 36x48; pins (-26,-8),(-26,8),(26,0), input leads left/output
-right. Preview draws the native three-pin triangle with + and - inputs.
-All four rotations supported; generated flips remain unsupported. Actual
-native AC/TD checks prove positive/negative input polarity, finite-gain
-resistor feedback, and a unity follower with k=1e15. OPAMP gain editing,
-parameter binding and symbolic/relayout remain outside their current scope.
-Automatic layout follows the active input to the output, preserving local
-feedback. examples/mfb-filter provides an automatically laid out 20-part
-three-stage MFB filter, editable passive parameters and saved graph formulas.
-Reference topology is TI SLOA049D Figure B-2 (18 parts + VIN/RL test fixtures);
-nominals and ideal-opamp model are explicitly assigned test choices.
+a component needs kind,name,nodes and value or declared numeric parameters.
+Use exact catalog pin order. Unknown fields, nonfinite values, unbounded arrays
+and unsafe file interfaces are rejected. Numeric defaults are adapter templates,
+not promised GUI defaults. Generation does not accept arbitrary scripts or
+SPICE imports. Node0 is native global ground; names are ASCII identifiers.
+External ports map public aliases to graph node names; do not replace ordinary
+wires with a port at each component pin. With numeric graph nodes use named
+aliases, e.g. ports={"IN":"17","OUT":"31"} and signals U(IN),U(OUT).
 
-Transformer / трансформатор: TR/TRANSFORMER, native Type6101, four nodes
-[p1,p2,s1,s2], value=n or parameters={n}; n=Np/Ns must be positive and finite.
-V(p1)-V(p2)=n*(V(s1)-V(s2)); dotted winding ends are native pins1 and3.
-TR is ideal and stores no magnetic energy. Add a separate L across its primary
-to model flyback magnetizing inductance. Ground each separate circuit part;
-the constructor uses node0 as a common numerical reference, not a floating
-secondary or insulation model. Reversing a winding's nodes reverses polarity.
+U/V nodes are [positive,negative]. I nodes are [from,to], positive current from
+first to second; I=[0,out],1mA into R=1kohm gives +1V. D=[anode,cathode].
+TR=[p1,p2,s1,s2], n=Np/Ns; pins1 and3 are dotted. TR is ideal and stores no
+magnetic energy: add a separate magnetizing L for flyback. SW nodes are
+[control+,control-,switch1,switch2]; Ron>0,Roff>=Ron,Uoff<=Uon. Control above
+Uon turns on; below Uoff turns off; hysteresis preserves intermediate state.
+OPAMP6400=[noninverting,inverting,output], Uout=k*(Uplus-Uminus), referenced to
+global ground, without supply pins or physical current/bandwidth limits.
+SUM7000=[output,common,input1,...],N=1..5,k is the coefficient list.
+AND/OR/XOR use N input pins followed by output,N=2..8. DFF/JK HasRS adds two
+asynchronous pins. BALMOD has3 physical pins; its internal fourth node is not
+an external terminal. Query detail for remaining parameter and geometry data.
 
-Voltage-controlled switch / управляемый напряжением ключ: SW/VCSWITCH,
-native Type6600, four nodes [control+,control-,switch1,switch2], all parameters
-{Ron,Roff,Uon,Uoff} required. Control is V(control+)-V(control-); the power
-branch is bidirectional and separate from the control pair. Ron>0,Roff>=Ron,
-Uoff<=Uon. Native hysteresis retains state between the two thresholds: rising
-control reaches Uon to turn on; falling control reaches Uoff to turn off.
-This is a native piecewise-linear switch, not a MOSFET or SPICE model import.
-The D diode node order is [anode,cathode], native pins1/2.
+Sources and time semantics
+--------------------------
+U and I expose all5 native modes: dc,sine,pulse,triangle,pwl. waveform accepts
+mode-specific amplitude,frequency,phase,delay,high,low,duty_percent,rise_time,
+finite_duration,periods,points,time_scale,scale,offset,periodic. PWL points are
+2..4096 finite [time,value] pairs with strictly increasing time. Numeric SI
+suffixes use p,n,u,m,k,M,G; m and M differ. Unicode unit literals are normalized
+before native execution, without rewriting native mathematical expressions.
 
-Flyback / обратноходовой преобразователь: fastmean_example(kind="flyback")
-returns native TR + magnetizing LM + SW + pulse voltage drive + D/C/R output.
-Aliases include flyback_converter. Defaults:24V,50kHz,40% duty,n=1,LM=200uH,
-Cout=47uF,load20ohm. Reverse the secondary relative to the primary so the
-rectifier conducts during switch-off. Run transient stop=.01,step=1e-7,
-eps=1e-5 and signals U(out),U(drain),I(LM),I(DOUT),U(gate).
-Saved analysis.transient also accepts eps with 0<eps<=0.1; the builtin flyback
-sets EPS=1e-5 so the standalone SCM and explicit batch request agree.
-Use fastmean_plot for startup and display_window=[.00994,.01],measurement_window=[.009,.01].
-The output mean in native6.1 is about15.584V. This open-loop model excludes
-saturation, leakage inductance and transistor parasitics. To edit TR/SW values,
-modify the saved JSON and create a fresh circuit/project; edit_values and
-generated bindings retain their documented R/C/L/U/I scope.
+Public waveform.delay is ALWAYS seconds. Native sine/pulse/triangle Delay is
+periods, converted with F; dc/PWL Delay is seconds. delay_periods is an explicit
+alternative to delay for periodic analytic modes. Native PHI0 zero is a cosine
+reference in checked6.1; phase=-90 gives sine. finite_duration gates the sine to
+periods (fractional NP allowed); otherwise NP is ignored. PWL periodic=false
+linearly extrapolates after its last point; periodic=true repeats for NP periods
+and then returns zero. Preserve native timing; do not shift samples to match an
+ideal curve. edit_values patches requested source fields and preserves omitted
+and inactive mode data. Raw native parameter editing retains native units.
 
-TR evidence: bundled DC-DC converter SCM and native IdealTrans geometry.
-SW evidence: native VCSwitch type dispatch, constructor, serialization and
-numerical probes of control sign, bidirectional conduction and hysteresis.
-TR body32x48; pins(-24,-32),(-24,32),(24,-32),(24,32), horizontal leads.
-SW body40x40; pins(-16,-28),(-16,28),(16,-28),(16,28), vertical leads.
-Native checks confirm n=2 maps10V to5V; D pin1 is the anode. Preview renders
-winding dots and switch control signs for all four native rotations.
+Layout and preview
+------------------
+Default density="compact" uses adjacent components and real orthogonal wires.
+Use layout.placements,nodes,ports,routes for reference placement; explicit
+coordinates are integers on a4-unit grid, rotations0..3. layout.nodes are soft
+routing hints; exact routes require orthogonal connected polylines. Unused
+branches may be pruned. Different-net collinear overlaps and ambiguous
+junctions are rejected; plain perpendicular crossings are unconnected.
+layout.ground_style="rail" is the common return; "local" places native GND near
+grounded pins. Explicit node0 routes require rail. Components may require manual
+coordinates when labels or the graph make automatic placement inadequate.
 
-Switching-event exports may repeat a transient timestamp for multiple states.
-TD permits nondecreasing time and preserves every native row in order; AC
-frequencies remain strictly increasing. No averaging, sorting or duplicate
-removal is performed. Equal-time intervals contribute zero to mean/RMS;
-peak/min/max include all event states. Exact window boundaries retain both
-sides. Coverage, finite values and native provenance checks remain active.
+Degree-two CON corners are removed only when endpoint-derived native bends
+reproduce the route. Branches, required waypoints and intentionally open-pin
+endpoints remain. A single free pin gets a short wire and one CON, not a fake
+load or external port. relayout always creates a new portable copy, retains
+saved settings, and verifies terminal connectivity. Unknown geometry, unstable
+numeric-node probes or unsupported model interfaces must fail explicitly.
+Preview PNG/SVG is an MCP engineering drawing, not a FASTMEAN screenshot.
+Some catalog symbols are functional blocks using native pin anchors, not exact
+GUI glyphs. Review every important scheme. include_text=false hides notes only
+in the image; original TEXT and parameter expressions remain in the SCM.
 
-fastmean_create_project authors native Type-7100 X hierarchies. Input is
-{models:{MODEL:{pins:{Left:["B"],Top:["C"],Right:[],Bottom:["E"]},
-circuit:{components:[...],ports:{B:"b",C:"c",E:"e"}}}},circuit:{...}}.
-An instance is {kind:"X",name:"Q1",model:"MODEL",
-connections:{B:"base",C:"collector",E:"0"}}. Native pins are numbered through
-Left, Top, Right, Bottom, preserving list order. Definitions may float; exposed
-ports must match pin names exactly. Every instance maps every pin. Model names
-and external pins are case-unambiguous ASCII identifiers; underscore-prefixed
-or numeric external pins are not generated. Native underscore-prefixed test
-components are preserved with a warning that parent expansion excludes them.
-There are at most 99 definitions and 32 exposed pins per definition. Missing
-models, active recursive cycles, path traversal and instance parameters are
-rejected. A file-reference cycle broken by a child-only underscore test instance
-is finite and supported. Only the initial root context activates test elements;
-the same file instantiated beneath itself is a child context. Project model
-metadata lists both dependencies and active_dependencies. Edited/annotated
-copies retain these references, including references to a renamed root file.
+Hierarchy and parameters
+------------------------
+create_project accepts models:{MODEL:{pins:{Left:[...],Top:[...],Right:[...],
+Bottom:[...]},circuit:{components:[...],ports:{...}}}},circuit:{...}.
+Instances use kind:X,name,model,connections mapping every declared pin.
+Up to99 definitions and32 public pins per model; names are case-unambiguous
+ASCII. Native interface order is Left,Top,Right,Bottom then per-side list order.
+Child PORT geometry determines binding: LeftRot2/RightRot0 sort byY;
+TopRot3/BottomRot1 sort byX. Manual child positions must preserve this order.
+Native X requires standard fonts, General.Scale100, short relative filenames.
+Project outputs include main.scm,models/*.scm,project.spec.json and hashes.
+Change topology by editing the published JSON then create_project again.
 
-Native 6.1 rebuilds a model's external interface from child PORT orientation
-and coordinates, not merely the cached parent Pins labels or object-list order.
-The compiler therefore positions and validates definition PORTs on their
-declared sides: Left Rot2 sorted by Y, Top Rot3 sorted by X, Right Rot0 sorted
-by Y, Bottom Rot1 sorted by X. Manual positions must preserve this order and
-use distinct ordering coordinates. This prevents silent terminal swaps in
-asymmetric models. Generated Type-7100 geometry requires default caption/pin
-fonts, General.Scale100 and model FileName captions at most20 ASCII characters.
+Active recursive models are rejected. A cycle through a child underscore test
+element can be finite: root test elements are active; child underscore elements
+and inactive subtrees are excluded exactly as native expansion does. Original
+and private model hashes are retained. Shared instances have separate nodes.
+Numeric instance parameter overrides via native Scm/Actual are not authored.
+Per-instance analysis IC/source-bias preparation clones private model branches
+so that siblings sharing a definition remain unaffected.
 
-Projects are created atomically in new directories and use relative SCM model
-references. Outputs include main.scm, models/*.scm, project.spec.json,
-per-circuit JSON specifications, SHA256 hashes and project.manifest.json.
-Read the published project.spec.json, modify its definitions/root circuit and
-call create_project again to rebuild an edited copy. Earlier files are kept.
-The initial API supports fixed numeric definitions only, without generated
-.parameter directives or native Scm/Actual parameter overrides. Creating a
-project requires neither FASTMEAN nor a GUI. Analyses use installed FASTMEAN;
-this does not establish the physical accuracy or ratings of a device model.
+annotate_circuit saves root numeric .parameter values, TEXT explanations and
+TD/FD expressions in a new copy. Legacy bindings={"R1":"R0"} and typed fields
+bindings={"TR1":{"n":"Ratio"},"VIN":{"PULSE.F":"Fswitch"}} are supported.
+Only declared scalar electrical fields may bind; files, model interfaces,
+structural enums and logic parameter expressions are excluded. edit_parameters
+changes existing finite numeric root constants, preserving binding expressions,
+comments and child models. It checks known literal ranges but is not a CAS.
+edit_values replaces selected element literals; edit_properties patches declared
+native parameter fields/tables and saved TD/FD/AOD/SOD/DCOP settings, with
+optional definitions=[{name,expression,arguments?}] saved as native .define TEXT.
+N/HasRS edits changing terminal count require a regenerated connected scheme.
 
-fastmean_annotate_circuit adds ROOT numeric .parameter declarations, supported
-R/C/L/U/I parameter bindings, explanatory native TEXT objects, and selected saved
-TD/FD signal expressions in a new portable copy. It preserves original source
-files and privately packages child SCM dependencies. The root's saved native
-analysis sections are retained before requested signals replace active traces.
-parameters maps ASCII names to finite numeric/SI values; bindings maps existing
-root component names to validated parameter expressions. descriptions is a list
-of plain explanation strings; td_signals/fd_signals contain mathematical
-expressions such as U(OUT), I(RL), db(U(OUT)/U(IN)), phs(U(OUT)/U(IN)). There are
-no generated parameter overrides for X instances. This authoring tool performs
-no calculation, GUI launch or desktop automation; analysis sanitizes its own
-private working copy again before native execution.
+inspect returns critical metadata/root_parameters plus byte-bounded sections:
+components,nodes,objects,texts,ports,parameters,analysis,wires,warnings,
+parameter_issues. Use section,offset,limit and next_offset; detail_path reads
+complete nested fields/chunks. expected_source_sha256 detects concurrent saves.
+No arbitrary file-read endpoint is provided. Model/file directives are validated
+before a native job; external DLL execution is not exposed.
 
-Private analysis and explicit-open copies recursively snapshot all validated
-local SCM models relative to each containing source file, reject active recursion and
-unvalidated external model/data fields, and retain original/private hashes.
-References inside native jobs point to private ASCII paths. open performs no
-analysis, leaves its GUI process for the user and does not automate the desktop.
+Numerical analyses
+------------------
+ac and transient use native batch scripts in fresh private jobs. definitions is
+a bounded list of {name,expression,arguments?}; overrides maps native variable
+or qualified component.parameter names to mathematical expressions. No script,
+command separator or caller-selected output filename is accepted.
+AC points2..10000,scale=log|linear. TD stop/step are seconds,eps in(0,.1],
+step budget<=1e6,signals<=30. Omitted signals select active saved f/t traces;
+custom saved XY plots need explicit expressions. Native exports must cover the
+requested interval and AC grid. Missing columns or partial outputs are errors.
 
-Default layout uses compact spacing and physical wires. Redundant degree-two
-CON corners are removed only when endpoint-derived native bends reproduce the
-same path. Branch junctions and necessary routing waypoints remain visible.
-External/analysis ports occur once per alias. Use relayout to convert former
-port-stub diagrams and preview to inspect PNG/SVG. Deliver the portable SCM
-and models; open the application only if explicitly requested by the user.
-Preview is an MCP rendering, not a screenshot. No desktop control is needed.
+transient supports sample_after,initial_conditions=scheme|zero|dc or an IC map,
+and state2scheme=true to save final IC in a separate SCM. Saved-state files are
+not imported. DC uses native DC initialization with zero-duration export, not a
+fabricated undocumented dc script command. source_values explicitly replaces
+non-DC waveforms for this private DC calculation. Source ramps/delays are cleared
+only in that working copy and recorded. sweep(target,values,analysis,settings)
+runs1..32 separate calculations from an immutable prepared project snapshot.
+Each point retains actual native files/provenance. TD sweeps with postfunctions
+use the summary path; settings.fft selects nativeFFT. A run timeout/cancel stops
+only that owned worker, never user windows or unrelated processes.
 
-The standard stdio server also works with Claude Code/Desktop, Kimi CLI and
-DeepSeek through Cline. Export local client JSON with
-python -m fastmean_mcp.client_config --client <profile> --app-dir <app>
---output-dir <results>. No model credentials or client-specific model SDKs
-belong in this MCP server. See docs/ai-clients.md for setup and test boundaries.
-For a reference drawing, create spec.layout may contain:
-  density: "compact"  # default; "standard" restores the previous spacing
-  placements: {"R1":{"x":1000,"y":1000,"rotation":0}}
-  nodes: {"in":{"x":800,"y":1000}}
-  routes: {"in":[[[800,1000],[920,1000],[920,960]]]}
-  ports: {"in":{"x":680,"y":1000,"rotation":2}}
-Explicit coordinates are integers on a native four-unit grid; automatic spacing stays20. Rotation is clockwise 0..3;
-R/C/L pin1 points west/north/east/south respectively. U pin1 is negative.
-layout.nodes are routing hints: an unused branch to a seed may be pruned.
-Use exact layout.routes polylines to require a particular physical path.
-Explicit polylines must be orthogonal and connected through their node hint.
-Component overlaps, collinear different-net wires, and ambiguous crossing
-junctions are rejected before SCM output. Plain perpendicular wire crossings
-are unconnected. Review labels and overall appearance after generation; this
-router does not guarantee a perfect arbitrary graph or reference-image clone.
-Density changes automatic spacing only: explicit placements, nodes, routes and
-port coordinates stay unchanged. It keeps native symbols and the default20-unit placement spacing.
-Relayout accepts density="compact" or "standard" and always creates a copy.
-Primitive caption bounds are measured for routing clearance. Later annotation
-can lengthen value labels; use concise parameter identifiers and inspect the
-annotated preview. Explicit routes can intentionally override label clearance.
-The attributed Point75A example contains 25 published RLC elements plus one
-source and three resistive test loads, with explicit compact reference layout.
+Transient events may repeat timestamps; retain both event states in native
+order. Equal-time jumps add zero integral; extrema include all states.
+U/C ideal-source loops, including verified active model boundaries, are checked
+before TD. Partial coverage is explicitly reported, not claimed as complete
+singularity analysis. Do not insert invented resistance or replacement samples.
 
-AC sampling is explicitly log or linear. Omitted signals use only active saved
-traces with the expected f/t x axis; disabled stale rows are excluded. Custom
-saved XY plots require explicit signals for both expressions. Batch charts use
-frequency/time on the x axis; data can be retrieved separately for XY plotting.
-Transient timeout is per request, 1–60 seconds, with default60; cancellation
-and timeout stop only the native worker owned by that request.
-In a native batch check, a saved definition p=i*2*PI*f produced no requested
-complex columns. An explicitly chosen working-copy variant using
-p=sqrt(-1)*2*PI*f matched an independent complex oracle. The adapter does not
-silently rewrite user expressions; malformed/missing columns are errors.
+Native postprocessing versus NumPy spectrum
+------------------------------------------
+evaluate signals may use native last,AVG,RMS or harmonic functions; summary
+exports are actual native final tables, not fake time-series axes. NativeFFT
+requires FFT expressions and fft={window:[start,end],points:1024,harmonics:40,
+window_type:0}; native window_type0..3. A separate time writer proves coverage
+and FFT frequencies are checked. harmonics extracts up to7 requested frequencies
+via native tre,tim,tmag,tph over window=[start,end]seconds. FASTMEAN calculates
+these values; Matplotlib renders their charts.
 
-Numeric results persist in private runs with manifests, full CSV and PNG;
-tool output is bounded. list_runs/get_result recover runs, read_data pages CSV,
-and artifact MCP resources expose registered outputs only. Cancellation stops
-only the adapter's own calculation processes. Existing GUI windows are left
-open. No Windows locale, security setting or proprietary binary is modified.
-Portable tests and opt-in native integration tests are included in tests/.
+spectrum is a DISTINCT NumPy rFFT of native TD samples: points16..262144,
+window_function=hann|rectangular|hamming|blackman|bartlett. Native event-aware
+piecewise interpolation produces a uniform grid. The result retains native CSV,
+window,amplitude/phase/PSD normalization and provenance. Interpolation creates no
+new physical bandwidth; choose a sufficiently fine native calculation step.
+Do not label this NumPy transform a native FFT or native window screenshot.
 
-Adapter additions (version 1.2.0)
+Symbolic contract
+-----------------
+Native FASTMEAN exports and expands connectivity before CIRSYM conversion.
+Linear zero-state R/C/L/U/I,G/E/F/H,OPAMP,TR/TR3,GYR,SUM,UNISTOR are supported,
+including X made of these classes. analysis=voltage|current|transfer|impedance|
+admittance selects U/I/H/Z/Y. output_reference defines voltage polarity;
+output_element selects current; input_source identifies the independent drive.
+Normalized H/Z/Y requires one independent source; output-only equations may
+contain several. Actual numeric native parameter values enter CIRSYM. Current
+sensors are inserted in series. Short unique aliases avoid native long-name
+collisions; the mapping back to user/model names is retained. CIRSYM supplies
+the expression; only documented substitutions and input-amplitude division are
+performed by the adapter. This is not an arbitrary/nonlinear equation solver.
+
+Registered artifacts and clients
 --------------------------------
-Independent current sources use kind I, native Type3010, nodes[from,to], and
-positive current flowing from the first node to the second. They support the
-same DC/sine/pulse waveform options as U sources, amplitude editing and root
-.parameter bindings. A native check of I=[0,out],1mA with R=1kohm gives +1V;
-reversing I gives -1V. This does not extend CIRSYM or legacy relayout support.
+plot takes a registered completed run_id and exact existing columns,panels,
+display_window,measurement_window,title,subtitle,x_unit. It starts no simulation
+and does not recompute selected formulas. TD RMS/mean use window-boundary
+interpolation and trapezoids on adaptive native samples before decimation.
+PNG/SVG,chart spec,measurements and provenance are published. Source CSV hashes
+are verified; modified data is rejected. get_result reopens saved MCP images;
+read_data pages rows; list_runs finds jobs. Reads expose registered outputs only,
+not arbitrary local files. See docs/PLOTTING.md for arguments and metric limits.
 
-Routing uses exact native pin axes and soft automatic node hubs, with expensive
-bends/crossings. Degree-two CON removal preserves the supported native path;
-branches remain visible. R/C/L/U/I/D/G/E/F preview captions have shared text clearance.
-This caption layout is our engineering preview, not verified native text
-placement. Explicit routes remain authoritative. Fixed geometry can still
-require detours or force a label overlap; inspect every important schematic.
-Set layout.ground_style=local for separate true node0 ground symbols, one per
-grounded component pin; default rail keeps a physical common return. Local
-ground placement fails if obstructed. Explicit node0 routes and local mode
-cannot be combined. Fine four-unit explicit positions permit control/source
-pins offset16/8 to align with adjacent component columns.
+Claude Code/Desktop,Kimi CLI,DeepSeek through Cline and generic stdio clients
+can use the same server. client_config exports local connection JSON; model
+credentials belong to the client. The MCP needs no model-provider keys.
 
-fastmean_plot accepts an existing registered, completed AC/transient run_id,
-panels[{signal,label?,unit?,scale?,metrics?,guides?,color?}], display_window,
-measurement_window, title, subtitle and x_unit. Signals must match original
-exported CSV columns exactly. It returns MCP ImageContent, PNG/SVG, chart spec,
-measurements and source hashes; no native process runs. Original SI windows
-remain seconds/Hz even when labels use ms/kHz. Transient RMS/mean use exact
-interpolated window endpoints and trapezoids on the original adaptive samples,
-before display decimation. AC supports display windows but not time metrics.
-See docs/PLOTTING.md for complete examples and numerical limitations.
-
-fastmean_preview(include_text=false) can omit TEXT notes from an image and its
-fit bounds. Omitted counts are reported; original SCM and parameter expressions
-are retained. Default previews include all notes.
-
-Adapter reliability (version 1.2.1)
-----------------------------------
-edit_values preserves a hierarchical project's recursive model files in its new
-job and registers them as artifacts. Move the complete returned folder, not its
-root SCM alone. Original project files remain unchanged.
-
-Native results must cover the requested interval; AC points must also match the
-requested log/linear grid. Duplicate canonical signal expressions are rejected.
-TD preflight checks each private SCM for local closed paths consisting only of
-independent ideal voltage sources and capacitors, with at least one voltage
-source. The manual (pages 13-14) lists these among invalid transient topologies.
-The adapter rejects them before process creation and does not insert resistance
-or change values. Pure capacitor loops are not rejected by this check; cycles
-crossing subcircuit boundaries and other singularities remain outside its scope.
-AC remains a separate operation. A physically justified finite source/series
-resistance can be modeled explicitly by the caller when appropriate.
-
-read_data verifies the complete CSV SHA256 on every paged read and returns that
-digest. Inline PNGs use the same registered-artifact checks as resource reads;
-modified files are rejected. Long plot panel captions wrap separately from
-metric summaries. Symbolic probes must be electrically connected, and missing
-CIRSYM executable/settings files are reported before native netlist export.
-
-Parameter editing and complete inspection (version 1.3.0)
--------------------------------------------------------
-fastmean_edit_parameters(path, updates, expected_source_sha256?) changes existing
-finite numeric root .parameter/.param literal spans in a new portable project.
-Names are case-sensitive. Labels/comments/other TEXT, direct component bindings,
-TD/FD formulas, wires and child model files are preserved. No calculation runs;
-existing descriptive prose retains its original wording. Expressions as targets,
-duplicates, overriding define/global/set names and conflicting child globals are
-rejected. Known direct passive/source range constraints are checked; arbitrary
-derived expressions and instance parameter overrides are not evaluated.
-
-fastmean_inspect returns root_parameters and critical metadata independently of
-verbose component data. Compact components omit raw Params. Use section with
-offset/limit to read complete components/nodes/objects/texts/ports/parameters/
-analysis/wires/warnings/parameter_issues; follow each page's next_offset.
-detail_path selects nested native mapping keys/list indices, including large
-USER waveform arrays and TEXT character chunks. Responses contain complete
-entries within 128KiB UTF-8 JSON, never recursive fragments of native objects.
-Reuse source_sha256 as expected_source_sha256 to reject saves between pages or
-before parameter edits. A deferred oversized summary item reports
-needs_detail_path; direct pages report an explicit error for oversized items.
-Reads create no files or processes. The server exposes22 MCP tools.
-See docs/PARAMETERS.md for examples, scope and limitations.
-
-Active project topology and open pins (version 1.3.1)
----------------------------------------------------
-TD preflight follows active native instance contexts, excluding underscore test
-components and their inactive subtrees only inside instantiated models. Local
-U/C loops and loops crossing verified model interfaces are checked. Repeated
-instances retain separate internal nodes; native ground remains global.
-PORT side/rotation/coordinate order must match Pins before joining a boundary.
-Unverified/flipped interfaces, native instance overrides and expansion limits
-are reported as partial coverage in manifest.transient_preflight, with bounded
-examples and counts. This is not a complete singularity or equation analysis.
-
-A single-terminal logical node is authored with a short wire to one native CON
-endpoint, as recommended by manual page12. That required endpoint survives leaf
-cleanup; no electrical load or external PORT is added. A bare unwired pin can
-make the native worker wait on an error. Explicit routes with a single terminal
-remain unsupported and fail clearly instead of being silently discarded.
-
-The harmonic U-source phase is passed through to native PHI0. In verified6.1,
-zero phase is a cosine reference; the example uses -90degrees for a sine.
-Native zero-state initialization and timing samples remain untouched. A tested
-1kHz RC cosine fixture has about64.3uV transient error against the ideal closed
-form even after finer requested sampling/eps; do not synthesize replacement
-samples or claim tighter solver precision from requested eps alone.
+Known boundaries
+----------------
+DIGITAL_IN410/DIGITAL_OUT420 are external DLL-module pin bindings, not regular
+PORT400 subcircuit terminals. Their alias.pin names refer to a module declared
+with Directives/.dll alias/file_name. Unbound contacts can crash native6.1.
+MCP does not generate/load this unsupported external-DLL context. Internal
+U_AUX2011/I_AUX3011 and legacy source aliases are not ordinary new components.
+No claim is made to automate every GUI dialog, parse pre6.0 binary SCM, import
+arbitrary SPICE/device models or bypass native DEMO/license constraints.
+No Windows locale,registry,PATH or security setting is changed. FASTMEAN Russian
+UI is a separate optional project. Portable and opt-in native tests are separate;
+see docs/VALIDATION-1.6.0.md for actual checks, not an assumption of universal
+compatibility or unrun CI success.

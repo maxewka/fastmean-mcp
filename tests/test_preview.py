@@ -71,7 +71,7 @@ class PreviewTests(unittest.TestCase):
 
     def test_unsupported_model_is_rejected_before_output_creation(self):
         data = yaml.safe_load(self.source.read_text(encoding="utf-8"))
-        data["scm"]["Scheme"]["Objects"].append({"ID": 9999, "Type": 6615,
+        data["scm"]["Scheme"]["Objects"].append({"ID": 9999, "Type": 99999,
             "Name": "MOS1", "X": 1500, "Y": 1500, "Rot": 0})
         self.rewrite(data)
         destination = self.root / "must-not-exist"

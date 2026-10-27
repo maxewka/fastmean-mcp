@@ -19,7 +19,11 @@ from .schematic import _load, _summarize, parse_value
 ORIGIN = "MCP schematic preview, not native screenshot"
 _SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}
 _COMPONENTS = {1000: "R", 1001: "C", 1002: "L", 2010: "U", 3010: "I"}
-_NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}
+_NATIVE_COMPONENTS = {410,420,1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}
+from .element_catalog import entries as _catalog_entries
+_NATIVE_COMPONENTS |= {entry["typeid"] for entry in _catalog_entries()
+    if entry["kind"] not in {"R","C","L","U","I"} and not entry.get("internal")}
+_SUPPORTED |= _NATIVE_COMPONENTS
 _DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
 _RENDER_LOCK = threading.Lock()
 
@@ -58,11 +62,16 @@ def _source_label(obj: dict) -> str:
     if mode == 2:
         ac = parameters.get("AC") or {}
         return f"sine: {_quantity(ac.get(quantity+'0'), unit)} / {_quantity(ac.get('F'), 'Hz')}"
-    if mode == 3:
-        pulse = parameters.get("PULSE") or {}
-        return (f"pulse: {_quantity(pulse.get(quantity+'MIN'), unit)} to "
+    if mode in {3,4}:
+        pulse = parameters.get("PULSE" if mode == 3 else "TRIANG") or {}
+        label = "pulse" if mode == 3 else "triangle"
+        return (f"{label}: {_quantity(pulse.get(quantity+'MIN'), unit)} to "
                 f"{_quantity(pulse.get(quantity+'MAX'), unit)} / {_quantity(pulse.get('F'), 'Hz')}")
-    raise PreviewError(f"Unsupported voltage-source waveform mode {mode!r}; only DC, sine and pulse are rendered.")
+    if mode == 5:
+        user = parameters.get("USER") or {}
+        points = (user.get(quantity) or {}).get("x") or []
+        return f"PWL: {len(points)} points" + (" / periodic" if user.get("PER") else "")
+    raise PreviewError(f"Unsupported source waveform mode {mode!r}.")
 
 
 def _anchor(obj: dict, pin: int) -> tuple[float, float]:
@@ -127,6 +136,9 @@ def _model(source: Path) -> dict:
             values[oid] = "Uon=" + _quantity(params.get("Uon"), "V") + "; Uoff=" + _quantity(params.get("Uoff"), "V")
         elif tid == 7100:
             values[oid] = Path(str((obj.get("Params") or {}).get("FileName", "")).replace("\\", "/")).stem
+        elif tid in _NATIVE_COMPONENTS:
+            from .captions import native_component_value
+            values[oid] = native_component_value(obj)
         elif tid == 900:
             text = str((obj.get("Params") or {}).get("Text", ""))
             if len(text) > 1000:
@@ -237,7 +249,7 @@ def _draw_native_component(axis, obj, value):
         axis.add_patch(Polygon([point(-10,-10), point(-10,10), point(8)], closed=True,
                                facecolor="white", edgecolor="#161b22", linewidth=1.55, zorder=4))
         line(point(11,-12), point(11,12))  # Native pin1 anode → pin2 cathode.
-    elif tid == 6400:
+    elif tid in {6400,6401}:
         # The triangle and its lead endpoints share the native 36x48 body.
         # The output is a third pin, referenced internally to global ground.
         axis.add_patch(Polygon([symbol_point(-18, -24), symbol_point(-18, 24), symbol_point(18, 0)],
@@ -284,6 +296,9 @@ def _draw_native_component(axis, obj, value):
         line(symbol_point(16, 12), symbol_point(7, -8))
         axis.plot(*zip(symbol_point(-7, 0), symbol_point(10, 0)), color="#6b7280",
                   linewidth=1, linestyle="--", zorder=4)
+    elif tid not in {6000,6001,6002,6003,7100}:
+        from .symbols import draw_catalog_symbol
+        draw_catalog_symbol(axis,obj)
     else:
         axis.add_patch(Rectangle((left, top), right-left, bottom-top, facecolor="white",
                                  edgecolor="#161b22", linewidth=1.55, zorder=4))
@@ -318,8 +333,8 @@ def _draw_native_component(axis, obj, value):
                 x, y = inset(pin, 15)
                 axis.text(x, y, str(pin), ha="center", va="center", fontsize=7,
                           color="#374151", zorder=8, parse_math=False)
-    if tid in {1101, 6000, 6001, 6002, 6101, 6400, 6600}:
-        from .captions import native_component_captions
+    from .captions import native_component_captions, CAPTION_TYPES
+    if tid in CAPTION_TYPES:
         for caption in native_component_captions(obj, value):
             caption = dict(caption)
             text = caption.pop("text")
@@ -426,7 +441,7 @@ def render_schematic(path: Path, output_dir: Path, *, include_text: bool = True)
                 figure.clear()
     return {"svg_path": str(svg_path), "png_path": str(png_path), "origin": ORIGIN,
             "source_path": str(model["source"]), "component_count": sum(o["Type"] in _COMPONENTS or o["Type"] in _NATIVE_COMPONENTS for o in objects.values()),
-            "port_count": sum(o["Type"] == 400 for o in objects.values()), "wire_count": len(model["segments"]),
+            "port_count": sum(o["Type"] in {400,410,420} for o in objects.values()), "wire_count": len(model["segments"]),
             "junction_count": sum(o["Type"] == 300 and model["degrees"][oid] >= 3 for oid, o in objects.items()),
             "routing_waypoint_count": sum(o["Type"] == 300 and model["degrees"][oid] == 2 for oid, o in objects.items()),
             "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/TR/OPAMP/SW/X geometry",

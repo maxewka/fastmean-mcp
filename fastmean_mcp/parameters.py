@@ -121,12 +121,21 @@ def _bindings(document: dict, name: str) -> list[dict]:
             field = {1000: "R", 1001: "C", 1002: "L"}[tid]
             fields.append((field, params.get(field)))
         elif tid in {2010, 3010}:
-            section = {1: "DC", 2: "AC", 3: "PULSE"}.get(params.get("ST"))
+            section = {1: "DC", 2: "AC", 3: "PULSE",4:"TRIANG",5:"USER"}.get(params.get("ST"))
             quantity = "I" if tid == 3010 else "U"
             if section:
                 for field, value in (params.get(section) or {}).items():
-                    if field in {quantity+"0", quantity+"MAX", quantity+"MIN", "F", "Delay", "TFR", "K", "PHI0"}:
+                    if field in {quantity+"0", quantity+"MAX", quantity+"MIN", "F", "Delay", "TFR", "K", "PHI0","ScaleT","Scale"+quantity,"Offset"+quantity}:
                         fields.append((section+"."+field, value))
+        elif tid not in {200,300,400,410,420,900,7100} and not 6900<=tid<=6914:
+            def visit(mapping,prefix=""):
+                if not isinstance(mapping,dict):return
+                for key,value in mapping.items():
+                    if key in {"FileName","Pins","N","ST","HasRS"}:continue
+                    path=prefix+key
+                    if isinstance(value,dict):visit(value,path+".")
+                    elif not isinstance(value,list):fields.append((path,value))
+            visit(params)
         for field, value in fields:
             if isinstance(value, str) and value.strip() == name:
                 found.append({"component": obj.get("Name"), "native_type": tid, "field": field})
@@ -180,7 +189,7 @@ def _changes(document: dict, updates: dict) -> tuple[dict, list[dict]]:
             target = binding["component"] + "." + field.rsplit(".", 1)[-1]
             if any(d["directive"] == "set" and d["name"] == target for d in declarations):
                 raise SchemeError(f"A root .set overrides parameter binding {target}.")
-            if (binding["native_type"] in {1000, 1001, 1002} or field.endswith((".F", ".TFR"))) and value <= 0:
+            if (binding["native_type"] in {1000, 1001, 1002} or field.rsplit(".",1)[-1] in {"F","TFR","Ron","Roff","n","n1","n2","Ri","Rb","Rc","Re","ScaleT"}) and value <= 0:
                 raise SchemeError(f"Parameter {name!r} requires a positive value for {binding['component']}.{field}.")
             if field.endswith(".Delay") and value < 0:
                 raise SchemeError(f"Parameter {name!r} cannot make a source delay negative.")

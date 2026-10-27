@@ -37,6 +37,29 @@ describe the example's nominal regime. This tool performs no calculation.
 literal. For example, editing `RFB_P` alone breaks its shared `Rf` binding;
 editing parameter `Rf` keeps both feedback resistors linked.
 
+In 1.6.0, `fastmean_annotate_circuit` can also create typed scalar bindings:
+
+```json
+{
+  "path":"<path-to-source.scm>",
+  "parameters":{"Ratio":2,"Fswitch":"50k"},
+  "bindings":{"TR1":{"n":"Ratio"},"VIN":{"PULSE.F":"Fswitch"}},
+  "descriptions":["Ratio: transformer primary/secondary turns ratio."]
+}
+```
+
+Use actual instance names and declared native fields from `fastmean_catalog`.
+Only scalar electrical fields bind this way; model/file interfaces, structural
+fields changing pin count, and logic parameter expressions are excluded.
+The same root parameter can drive several fields. This is not generation of
+native per-instance `X` parameter overrides.
+
+For a direct property or table edit, use `fastmean_edit_properties`, for example
+`updates={"TR1":{"n":2},"SW1":{"Ron":0.01}}`. It preserves omitted native
+fields and creates a portable copy. It also accepts saved TD/FD/AOD/SOD/DCOP
+settings and definitions `{name,expression,arguments?}`. Changing N/HasRS when
+it would change physical terminals requires regenerating the connected circuit.
+
 ## Supported declarations
 
 Native manual pages27–30 document parameter/definition directives, semicolon

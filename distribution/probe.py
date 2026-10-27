@@ -18,6 +18,8 @@ REQUIRED_TOOLS = {"fastmean_status", "fastmean_example", "fastmean_create_circui
                   "fastmean_annotate_circuit",
                   "fastmean_edit_parameters",
                   "fastmean_export_netlist",
+                  "fastmean_catalog", "fastmean_edit_properties", "fastmean_dc", "fastmean_sweep",
+                  "fastmean_spectrum", "fastmean_harmonics", "fastmean_evaluate",
                   "fastmean_ac", "fastmean_transient", "fastmean_plot", "fastmean_symbolic", "fastmean_inspect"}
 
 
@@ -65,7 +67,7 @@ def inspect(python: Path, app_dir: Path, output_dir: Path, config_home: Path,
         raise ValueError("Result folder must be outside the FASTMEAN installation.")
     if not str(output_dir).isascii():
         raise ValueError("Native batch output folder must have an ASCII path.")
-    packages = {name: version(name) for name in ("fastmean-mcp-local", "mcp", "PyYAML", "matplotlib")}
+    packages = {name: version(name) for name in ("fastmean-mcp-local", "mcp", "PyYAML", "matplotlib", "numpy")}
     import fastmean_mcp.server  # noqa: F401 - detect actual import/API mismatches
     config = config_home / "config.toml"
     data = tomllib.loads(config.read_text(encoding="utf-8-sig"))

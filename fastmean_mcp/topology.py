@@ -77,11 +77,11 @@ def _interface(instance, child):
     pins = params.get("Pins")
     if not isinstance(pins, dict):
         return None, "Missing native Pins mapping."
-    ports = [o for o in child["objects"] if o["Type"] == 400 and not o["Name"].startswith("_")]
+    ports = [o for o in child["objects"] if o["Type"] in {400,410,420} and not o["Name"].startswith("_")]
     ordered = []
     for side, rotation, axis in SIDES:
         expected = pins.get(side) or []
-        actual = [p for p in ports if p.get("Rot", 0) == rotation]
+        actual = [p for p in ports if (p.get("Rot",0)+(2 if p["Type"]==420 else 0))%4 == rotation]
         if any(p.get("FlipV", 0) or p.get("FlipH", 0) or type(p.get(axis)) is not int for p in actual):
             return None, "Flipped or noninteger PORT geometry has not been verified."
         actual.sort(key=lambda p:p[axis])

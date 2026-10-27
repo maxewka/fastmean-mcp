@@ -27,6 +27,9 @@ SPACING = {
 DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
 PIN_FOR_DIRECTION = {direction: index + 1 for index, direction in enumerate(DIRECTIONS)}
 TYPE_IDS = {"R": 1000, "C": 1001, "L": 1002, "U": 2010, "I": 3010}
+from .element_catalog import entries as _catalog_entries, get_element as _catalog_element
+_NATIVE_TYPES = frozenset(entry["typeid"] for entry in _catalog_entries()
+    if entry["kind"] not in TYPE_IDS and not entry.get("internal"))
 
 
 class LayoutError(ValueError):
@@ -58,21 +61,30 @@ def _layout_link(item):
     if len(nodes) == 2:
         return nodes[0], nodes[1], 1, 2
     kind = item["kind"]
-    if kind in {"G", "E", "F", "TR"}:
+    if kind in {"G", "E", "F", "H", "GYR", "TR", "TR3", "LINE"}:
         a = 0 if nodes[0] != "0" else 1
         b = 2 if nodes[2] != "0" else 3
         return nodes[a], nodes[b], a+1, b+1
     if kind == "SW":
         return nodes[2], nodes[3], 3, 4
-    if kind == "OPAMP":
+    if kind in {"OPAMP", "OPAMP_SAT", "COMP"}:
         pin = 1 if nodes[0] != "0" else 2
         return nodes[pin-1],nodes[2],pin,3
+    if kind in {"AND", "OR", "XOR"}:
+        return nodes[0],nodes[-1],1,len(nodes)
     if kind == "X":
         pins = item.get("_native_params", {}).get("Pins") or {}
         ordered = [name for side in ("Left", "Top", "Right", "Bottom") for name in pins.get(side) or []]
         if pins.get("Left") and pins.get("Right"):
             a, b = ordered.index(pins["Left"][0]), ordered.index(pins["Right"][0])
             return nodes[a], nodes[b], a+1, b+1
+    try:
+        relation = _catalog_element(kind).get("stage_link")
+    except KeyError:
+        relation = None
+    if relation and max(relation) <= len(nodes):
+        a,b=relation
+        return nodes[a-1],nodes[b-1],a,b
     return None
 
 
@@ -81,7 +93,7 @@ def _path(components: list[dict], start: str, end: str, *, exclude_tests=False, 
     outputs = set()
     if stage_relations:
         for item in components:
-            if item["kind"] in {"G","E","F","TR","SW","OPAMP"}:
+            if len(item["nodes"]) > 2:
                 link = _layout_link(item)
                 if link and link[1] != "0": outputs.add(link[1])
     for index, item in enumerate(components):
@@ -295,7 +307,7 @@ class _Router:
             elif obj["Type"] in TYPE_IDS.values():
                 x, y = obj["X"], obj["Y"]
                 rectangles.append((x-20, y-20, x+20, y+20))
-            elif obj["Type"] in {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}:
+            elif obj["Type"] in _NATIVE_TYPES:
                 from .native_geometry import body_bounds
                 rectangles.append(body_bounds(obj))
             from .captions import CAPTION_TYPES, caption_bounds, native_component_captions, native_component_value

@@ -98,6 +98,32 @@ def _validated_request(document: dict, parameters: Any, bindings: Any, descripti
     for name, parameter in bindings.items():
         if not isinstance(name, str) or name not in names or len(names[name]) != 1:
             raise SchemeError(f"Binding component {name!r} is missing or ambiguous; use its exact native name.")
+        if isinstance(parameter,dict):
+            obj=names[name][0]
+            if 6900<=obj["Type"]<=6914:
+                raise SchemeError("Native logic parameters do not support general expressions; use numeric properties.")
+            if not parameter or len(parameter)>64:
+                raise SchemeError("Native field bindings require 1 to 64 property paths.")
+            for field,value in parameter.items():
+                if not isinstance(field,str) or not all(_IDENTIFIER.fullmatch(part) for part in field.split(".")):
+                    raise SchemeError("Binding fields must be native dotted parameter paths.")
+                if not isinstance(value,str) or value not in numeric:
+                    raise SchemeError("Every field binding must name a parameter declared in this request.")
+                target=obj.get("Params") or {}
+                parts=field.split(".")
+                if any(part in {"FileName","Pins","ST","N","HasRS"} for part in parts):
+                    raise SchemeError("File interfaces and topology selectors cannot be parameter bindings.")
+                for part in parts:
+                    if not isinstance(target,dict) or part not in target:
+                        raise SchemeError(f"Unknown native field binding {name}.{field}.")
+                    target=target[part]
+                if isinstance(target,(dict,list,bool)):
+                    raise SchemeError("Bindings target numeric scalar native parameters only.")
+                leaf=parts[-1]
+                if leaf in {"R","C","L","Ron","Roff","n","n1","n2","F","TFR","Ri","Rb","Rc","Re","ScaleT"} and numeric[value]<=0:
+                    raise SchemeError(f"Binding {name}.{field} requires a positive value.")
+            normalized[name]=copy.deepcopy(parameter)
+            continue
         if not isinstance(parameter, str) or parameter not in numeric:
             raise SchemeError(f"Binding {name!r} must refer to a parameter declared in this request.")
         obj = names[name][0]
@@ -165,7 +191,7 @@ def _text_objects(document: dict, parameters: dict, descriptions: list[str], bin
     units: dict[str, set[str]] = {}
     for obj in objects:
         parameter = bindings.get(obj.get("Name"))
-        if parameter is not None:
+        if isinstance(parameter,str):
             units.setdefault(parameter, set()).add({1000: "ohm", 1001: "F", 1002: "H", 2010: "V",3010:"A"}[obj["Type"]])
 
     def declaration(name: str, value: float) -> str:
@@ -336,7 +362,13 @@ def _copy_circuit(source_path: str | Path, output_path: str | Path,
                     if parameter is None:
                         continue
                     params = obj["Params"]
-                    if obj["Type"] in {1000, 1001, 1002}:
+                    if isinstance(parameter,dict):
+                        for field,value in parameter.items():
+                            target=params
+                            parts=field.split(".")
+                            for part in parts[:-1]:target=target[part]
+                            target[parts[-1]]=value
+                    elif obj["Type"] in {1000, 1001, 1002}:
                         params[{1000: "R", 1001: "C", 1002: "L"}[obj["Type"]]] = parameter
                     else:
                         params[{1: "DC", 2: "AC"}[params["ST"]]]["I0" if obj["Type"]==3010 else "U0"] = parameter

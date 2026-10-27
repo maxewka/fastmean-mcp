@@ -155,7 +155,8 @@ class SymbolicPrerequisiteTests(unittest.IsolatedAsyncioTestCase):
             netlist = job / "netlist.txt"
             netlist.write_text(text, encoding="ascii")
             native = SimpleNamespace(cancel_event=threading.Event(), export_netlist=lambda _: {
-                "ok": True, "working_dir": str(job), "path": str(netlist), "text": text})
+                "ok": True, "working_dir": str(job), "path": str(netlist), "text": text,
+                "source_models":[{"private_path":str(source)}]})
             async def execute(name, path, operation):
                 return operation(native)
             failure = {"ok": False, "cwd": None, "equations": [],

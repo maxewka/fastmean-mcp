@@ -163,8 +163,9 @@ def relayout_circuit(
         raise FileNotFoundError(f"Output directory does not exist: {output.parent}")
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
     before = _summarize(original, source, encoding)
-    if before["unsupported_type_ids"]:
-        raise SchemeError(f"Relayout supports R/C/L/U only; unsupported native component types: {before['unsupported_type_ids']}")
+    if before["unsupported_type_ids"] or any(obj["Type"] in {410,420} for obj in original["scm"]["Scheme"].get("Objects") or []):
+        from .native_relayout import relayout_native
+        return relayout_native(source,output,placements,density)
     if not before["components"]:
         raise SchemeError("Relayout requires at least one supported electrical component.")
     components_by_id = {obj["ID"]: obj for obj in before["objects"] if obj["Type"] in {1000, 1001, 1002, 2010}}

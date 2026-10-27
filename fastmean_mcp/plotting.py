@@ -1,7 +1,7 @@
-"""Repeatable charts and measurements of registered native FASTMEAN samples.
+"""Repeatable charts of registered FASTMEAN samples and identified transforms.
 
 No solver, expression evaluator, GUI or caller-supplied file path is involved.
-Display scaling changes presentation only; measurements retain native values.
+Display scaling changes presentation only; measurements retain exported values.
 """
 from __future__ import annotations
 
@@ -145,13 +145,16 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
     table = store.load_native_data(run_id)
     columns, values, analysis = table["columns"], table["values"], table["analysis"]
     x = values[0]
+    frequency = analysis in {"ac", "native_fft", "spectrum"}
+    origin = table.get("data_origin", "Native FASTMEAN numeric export")
+    default_title = {"native_fft": "FASTMEAN native FFT", "spectrum": "NumPy spectrum of FASTMEAN transient data"}.get(analysis, "FASTMEAN native data")
     display = _window(display_window, x, "display_window")
     measurement = _window(measurement_window, x, "measurement_window")
-    title = _text(title, "title", 160, optional=True) or "FASTMEAN native data"
+    title = _text(title, "title", 160, optional=True) or default_title
     subtitle = _text(subtitle, "subtitle", 240, optional=True)
-    x_unit = x_unit if x_unit is not None else ("Hz" if analysis == "ac" else "s")
+    x_unit = x_unit if x_unit is not None else ("Hz" if frequency else "s")
     if not isinstance(x_unit, str) or x_unit not in _UNITS or _UNITS[x_unit][0] != columns[0]:
-        raise PlotError("x_unit must be s/ms/us for transient data or Hz/kHz/MHz for AC data.")
+        raise PlotError("x_unit must be s/ms/us for transient data or Hz/kHz/MHz for frequency data.")
     x_scale = _UNITS[x_unit][1]
     if not all(math.isfinite(value * x_scale) for value in display):
         raise PlotError("Displayed x axis exceeds finite numeric range.")
@@ -179,7 +182,7 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
         guides = _choices(panel.get("guides", []), "guides", ("mean", "rms"))
         metrics = list(dict.fromkeys([*metrics, *guides]))
         if analysis != "transient" and metrics:
-            raise PlotError("Time-weighted measurements and guides require transient data; AC panels use metrics=[].")
+            raise PlotError("Time-weighted measurements and guides require transient data; frequency panels use metrics=[].")
         color = panel.get("color", _COLORS[index % len(_COLORS)])
         if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
             raise PlotError("panel color must be a #RRGGBB hexadecimal color.")
@@ -204,10 +207,11 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
                              "sample_count": sample_count, "interpolated_boundaries": interpolated})
     spec = {"format": "fastmean-mcp-chart-v1", "source_run_id": run_id,
             "analysis": analysis, "title": title, "subtitle": subtitle,
+            "frequency_domain": frequency, "data_origin": origin,
             "display_window": display, "measurement_window": measurement, "x_unit": x_unit,
             "x_scale": x_scale, "x_axis_scale": table["request"].get("scale", "linear") if analysis == "ac" else "linear",
             "panels": normalized,
-            "scale_semantics": "display_value = native_value * scale; unit is a caller-supplied display label"}
+            "scale_semantics": "display_value = exported_value * scale; unit is a caller-supplied display label"}
     measurement_result = {"format": "fastmean-mcp-measurements-v1", "source_run_id": run_id,
         "axis": columns[0], "window": measurement,
         "method": {"mean": "trapezoid(y, t) / duration", "rms": "sqrt(trapezoid(y**2, t) / duration)",
@@ -216,6 +220,10 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
                    "simultaneous_samples": "native order retained; zero-duration intervals add no integral; all event states included in extrema",
                    "values": "metrics use native exported column values; display_metrics apply panel scale"},
         "signals": measurements}
+    if frequency:
+        measurement_result["method"] = {
+            "frequency_data": "No time-weighted metrics or guides are evaluated for frequency-domain data",
+            "values": "Panels display authenticated exported bins; no transform or native calculation is rerun"}
     return {"spec": spec, "measurements": measurement_result, "series": rendered,
             "provenance": table["provenance"], "source_row_count": table["row_count"]}
 
@@ -288,7 +296,7 @@ def render_plot(plan: dict, job: Path) -> dict:
                 # overlap even for valid labels. Stack their text and allocate
                 # vertical space for wrapped metrics instead of clipping it.
                 axis.set_title(title, loc="left", fontsize=9, parse_math=False)
-                axis.set_ylabel(textwrap.fill(panel["unit"] or "Native value", width=12,
+                axis.set_ylabel(textwrap.fill(panel["unit"] or "Value", width=12,
                                               break_on_hyphens=False), fontsize=9, parse_math=False)
                 axis.set_xlim(*(value * spec["x_scale"] for value in spec["display_window"]))
                 axis.grid(True, which="both", color="#e2e8f0", alpha=.9)
@@ -296,19 +304,19 @@ def render_plot(plan: dict, job: Path) -> dict:
                 axis.margins(y=.1)
                 for metric in panel["guides"]:
                     axis.axhline(result["display_metrics"][metric], color="#475569", linestyle="--", linewidth=1.0)
-            axes[-1].set_xlabel(("Frequency" if spec["analysis"] == "ac" else "Time") + f" ({spec['x_unit']})", parse_math=False)
+            axes[-1].set_xlabel(("Frequency" if spec["frequency_domain"] else "Time") + f" ({spec['x_unit']})", parse_math=False)
             # Bound long user captions on the actual fixed-width canvas. This
             # also breaks unspaced captions instead of clipping them at the edge.
             heading = textwrap.fill(spec["title"], width=62, break_on_hyphens=False)
             if spec["subtitle"]:
                 heading += "\n" + textwrap.fill(spec["subtitle"], width=62, break_on_hyphens=False)
             dw, mw = spec["display_window"], spec["measurement_window"]
-            native_unit = "Hz" if spec["analysis"] == "ac" else "s"
+            native_unit = "Hz" if spec["frequency_domain"] else "s"
             heading += f"\nDisplay: {dw[0]:.8g}–{dw[1]:.8g} {native_unit}"
             if any(panel["metrics"] for panel in spec["panels"]):
                 heading += f" · Measurements: {mw[0]:.8g}–{mw[1]:.8g} {native_unit}"
             figure.suptitle(heading, fontsize=11, parse_math=False)
-            figure.supxlabel("Native FASTMEAN numeric export · Matplotlib rendered by MCP · no native GUI capture", fontsize=8, color="#64748b", parse_math=False)
+            figure.supxlabel(spec["data_origin"] + " · Matplotlib rendered by MCP · no native GUI capture", fontsize=8, color="#64748b", parse_math=False)
             for dpi in (120, 100, 80):
                 figure.savefig(png, format="png", dpi=dpi, metadata={"Software": "FASTMEAN MCP / Matplotlib"})
                 if png.stat().st_size < MAX_PNG_BYTES:
@@ -337,4 +345,4 @@ def render_plot(plan: dict, job: Path) -> dict:
             "display_window": spec["display_window"], "measurement_window": spec["measurement_window"],
             "source_row_count": plan["source_row_count"], "panels": spec["panels"],
             "measurements": measurements, "provenance": plan["provenance"], "renderer": renderer,
-            "plot_provenance": "Native FASTMEAN numeric export rendered by MCP/Matplotlib; no new simulation or native GUI capture"}
+            "plot_provenance": spec["data_origin"] + " rendered by MCP/Matplotlib; no new simulation or native GUI capture"}

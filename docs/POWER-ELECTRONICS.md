@@ -69,11 +69,13 @@ and terminal order. `fastmean_preview` draws actual routed connections, winding
 polarity dots, and switch control signs, including all four rotations.
 The picture is an MCP rendering of SCM objects, not a native screenshot.
 
-To change `n` or switch parameters, edit the saved JSON specification and
-create a new circuit/project. `fastmean_edit_values` and generated parameter
-bindings remain limited to their documented R/C/L/U/I scope. The symbolic
-and relayout adapters retain their existing R/C/L/U restrictions. These
-restrictions do not prevent native transient analysis of TR/SW circuits.
+To change `n` or switch parameters in a new copy, use
+`fastmean_edit_properties(updates={"TR1":{"n":2},"SW1":{"Ron":0.01}})`.
+Typed root bindings such as `bindings={"TR1":{"n":"Ratio"}}` with
+`parameters={"Ratio":2}` expose important values as editable `.parameter` TEXT.
+Use actual component names. Rebuild from the saved JSON when changing topology.
+TR and TR3 are supported by the linear CIRSYM adapter; the nonlinear SW is not.
+Catalog primitives and verified X interfaces are supported by relayout.
 
 Transient exports can contain multiple native states at the same timestamp.
 MCP preserves them in order, including both sides of the jump; mean/RMS give

@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastmean-mcp-local"
-version = "1.5.0"
+version = "1.6.0"
 description = "Local stdio MCP adapter for FASTMEAN native circuit analysis"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.12"
-dependencies = ["mcp==2.3.0", "PyYAML==6.0.3", "matplotlib==3.11.2"]
+dependencies = ["mcp==2.3.0", "PyYAML==6.0.3", "matplotlib==3.11.2", "numpy==2.5.4"]
 
 [project.scripts]
 fastmean-mcp = "fastmean_mcp.server:main"

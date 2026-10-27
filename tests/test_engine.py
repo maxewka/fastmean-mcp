@@ -82,6 +82,27 @@ class EngineSafetyTests(unittest.TestCase):
                     prepare_copy(candidate, self.root / "unsafe-copy.scm")
                 self.assertFalse((self.root / "unsafe-copy.scm").exists())
 
+    def test_dll_directives_and_unbound_external_contacts_fail_before_launch(self):
+        original = self.source.read_bytes()
+        for external in ("directive", "contact", "text"):
+            with self.subTest(external=external):
+                document = yaml.safe_load(original)
+                if external == "directive":
+                    document["scm"]["Directives"] = {".dll":[{"alias":"CTRL","file_name":"controller.dll"}]}
+                elif external == "contact":
+                    port = next(obj for obj in document["scm"]["Scheme"]["Objects"] if obj["Type"]==400)
+                    port.update(Type=410,Name="CTRL.input")
+                else:
+                    document["scm"]["Scheme"]["Objects"].append({"ID":999,"Type":900,"Params":{"Text":'.dll CTRL "controller.dll"'}})
+                source = self.root / f"{external}.scm"
+                source.write_text(yaml.safe_dump(document), encoding="utf-8")
+                with patch("fastmean_mcp.engine.subprocess.Popen") as launch:
+                    with self.assertRaisesRegex(EngineError,"DLL|Embedded"):
+                        prepare_copy(source,self.root/f"{external}-private.scm")
+                    launch.assert_not_called()
+                self.assertFalse((self.root/f"{external}-private.scm").exists())
+        self.assertEqual(self.source.read_bytes(),original)
+
     def test_signal_validator_accepts_math_and_rejects_script_fragments(self):
         for signal in ["db(U(out)/U(in))", "phs(U(out)/U(in))", "I(R1)",
                        "U(out) + 2 * I(R1)", "exp(-t/(R1.R*C1.C))", "max(U(out),0)"]:

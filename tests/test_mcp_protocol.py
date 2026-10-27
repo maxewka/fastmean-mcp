@@ -41,6 +41,8 @@ REQUIRED_TOOLS = {
     "fastmean_list_examples", "fastmean_open", "fastmean_search_manual",
     "fastmean_relayout", "fastmean_preview", "fastmean_list_runs",
     "fastmean_get_result", "fastmean_read_data", "fastmean_cancel", "fastmean_plot", "fastmean_edit_parameters",
+    "fastmean_catalog", "fastmean_edit_properties", "fastmean_dc", "fastmean_sweep", "fastmean_spectrum", "fastmean_harmonics",
+    "fastmean_evaluate",
 }
 NATIVE_ENABLED = os.environ.get("FASTMEAN_MCP_NATIVE_TEST", "").lower() in {"1", "true", "yes"}
 
@@ -314,7 +316,7 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
             async with self.session(output_dir) as client:
                 listed = await client.list_tools()
                 names = {tool.name for tool in listed.tools}
-                self.assertEqual(len(REQUIRED_TOOLS), 22)
+                self.assertEqual(len(REQUIRED_TOOLS), 29)
                 self.assertFalse(REQUIRED_TOOLS - names,
                                  f"Missing tools: {sorted(REQUIRED_TOOLS - names)}")
                 for tool in listed.tools:
@@ -839,7 +841,9 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                                     for equation in equations), repr(equations))
                 transfer = symbolic.get("transfer_function", {})
                 self.assertTrue(transfer.get("expression"), repr(transfer))
-                self.assertEqual(transfer.get("input_parameter"), "E_U1")
+                input_alias=transfer.get("input_parameter")
+                self.assertEqual(symbolic["conversion"]["native_aliases"].get(input_alias),"U1")
+                self.assertIn(input_alias,symbolic["parameters"])
                 self.assertEqual(original.read_bytes(), original_bytes,
                                  "Native analysis and value edits must preserve the source SCM")
                 await self.call_success(client, "fastmean_status")

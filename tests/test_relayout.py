@@ -111,7 +111,7 @@ class RelayoutTests(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), original)
 
     def test_unsupported_component_is_rejected_before_destination_is_created(self):
-        self.document["scm"]["Scheme"]["Objects"].append({"ID": 1000, "Type": 1100, "Name": "NLR1", "X": 0, "Y": 0})
+        self.document["scm"]["Scheme"]["Objects"].append({"ID": 1000, "Type": 99999, "Name": "UNKNOWN1", "X": 0, "Y": 0})
         self.save_source()
         with self.assertRaisesRegex(SchemeError, "unsupported native"):
             relayout_circuit(self.source, self.destination)

@@ -44,18 +44,44 @@ class NativeOutputTests(unittest.TestCase):
 
 
 class NativeConversionTests(unittest.TestCase):
+    def test_large_finite_opamp_gain_is_not_replaced_with_an_ideal_constraint(self):
+        for gain in (1e14,1e15,1e16):
+            with self.subTest(gain=gain):
+                converted=cirsym_from_fastmean_netlist(
+                    f"AMP 1 0 2 {gain}\nVIN 0 1 AC 1 1k 0 -1 0\nRL 2 0 1k\nIN 1\nOUT 2",
+                    component_kinds={"AMP":"OPAMP","VIN":"U","RL":"R"})
+                self.assertEqual(converted["symbolic_parameters"]["K1"],gain)
+                self.assertTrue(any(line.startswith("K1 ") for line in converted["netlist"].splitlines()))
+                self.assertFalse(any(line.startswith("N") for line in converted["netlist"].splitlines()))
+
+    def test_long_similar_names_receive_distinct_short_native_aliases(self):
+        text='\n'.join(['R_RL1 1 2 1k','R_RL2 2 0 1k','U1 0 1 DC 1','OUT 2','IN 1'])
+        converted=cirsym_from_fastmean_netlist(text,component_kinds={'R_RL1':'R','R_RL2':'R','U1':'U'})
+        aliases=converted['native_aliases']
+        self.assertEqual(aliases['R1'],'R_RL1')
+        self.assertEqual(aliases['R2'],'R_RL2')
+        self.assertEqual(len(aliases),len(set(aliases)))
+        self.assertTrue(all(len(alias)<=4 for alias in aliases))
+
+    def test_native_sum_header_and_coefficients_keep_pin_order(self):
+        text='\n'.join(['SUM1 2 1 2 2 0 1 1','U1 0 1 DC 1','R1 2 0 1k','OUT 2','IN 1'])
+        converted=cirsym_from_fastmean_netlist(text,component_kinds={'SUM1':'SUM','U1':'U','R1':'R'})
+        summer=next(c for c in converted['components'] if c['kind']=='SUM')
+        self.assertEqual(summer['nodes'],[2,0,1,1])
+        self.assertEqual(summer['parameters'],{'N':2,'k':[1,2]})
+
     def test_exported_native_rc_retains_topology_and_source_polarity(self):
         converted = cirsym_from_fastmean_netlist(NATIVE_EXPORTED_RC)
         lines = converted["netlist"].splitlines()
-        self.assertIn("R_R1 1 2 1000", lines)
-        capacitor = next(line.split() for line in lines if line.startswith("c_C1 "))
-        self.assertEqual(capacitor[:3], ["c_C1", "2", "0"])
+        self.assertIn("R1 1 2 1000", lines)
+        capacitor = next(line.split() for line in lines if line.startswith("c1 "))
+        self.assertEqual(capacitor[:3], ["c1", "2", "0"])
         self.assertEqual(float(capacitor[3]), 1e-6)
-        self.assertIn("E_U1 0 1 1", lines)
-        self.assertIn("U_symbolic_output 2 0", lines)
+        self.assertIn("E1 0 1 1", lines)
+        self.assertIn("U1 2 0", lines)
         self.assertNotIn("U_symbolic_input 1 0", lines)
-        self.assertEqual(converted["input_parameter"], "E_U1")
-        self.assertEqual(converted["transfer_relation"], "U_symbolic_output/E_U1")
+        self.assertEqual(converted["input_parameter"], "E1")
+        self.assertEqual(converted["transfer_relation"], "U1/E1")
 
     def test_spec_and_native_source_conventions_produce_same_polarity(self):
         spec = {"components": [
@@ -64,7 +90,7 @@ class NativeConversionTests(unittest.TestCase):
             {"kind": "U", "name": "U1", "nodes": ["in", "0"], "value": 1},
         ]}
         converted = netlist_from_spec(spec, input_node="in")
-        self.assertIn("E_U1 0 1 1", converted["netlist"].splitlines())
+        self.assertIn("E1 0 1 1", converted["netlist"].splitlines())
         self.assertEqual(converted["node_map"], {"0": 0, "in": 1, "out": 2})
 
     def test_unknown_renamed_element_is_rejected_instead_of_guessing_kind(self):
@@ -74,7 +100,7 @@ class NativeConversionTests(unittest.TestCase):
             NATIVE_EXPORTED_RC.replace("R1 ", "load "),
             component_kinds={"load": "R", "C1": "C", "U1": "U"},
         )
-        self.assertIn("R_load 1 2 1000", converted["netlist"].splitlines())
+        self.assertIn("R1 1 2 1000", converted["netlist"].splitlines())
 
     def test_nonzero_initial_conditions_are_not_silently_dropped(self):
         with self.assertRaisesRegex(ValueError, "initial conditions"):
@@ -113,7 +139,7 @@ class NativeConversionTests(unittest.TestCase):
             {"kind": "C", "name": "C1", "nodes": ["out", "0"], "value": "1u"},
         ]}
         converted = netlist_from_spec(spec, input_node="in")
-        self.assertIn("E_U1 0 1 3", converted["netlist"].splitlines())
+        self.assertIn("E1 0 1 3", converted["netlist"].splitlines())
 
     def test_zero_input_amplitude_is_not_returned_as_a_division_by_zero_transfer(self):
         text = NATIVE_EXPORTED_RC.replace("U1 0 1 AC 1 1k", "U1 0 1 AC 0 1k")
@@ -121,7 +147,7 @@ class NativeConversionTests(unittest.TestCase):
             cirsym_from_fastmean_netlist(text)
         converted = cirsym_from_fastmean_netlist(text, input=None)
         self.assertIsNone(converted["input_parameter"])
-        self.assertIn("E_U1 0 1 0", converted["netlist"].splitlines())
+        self.assertIn("E1 0 1 0", converted["netlist"].splitlines())
 
     def test_floating_island_is_rejected_before_native_singular_analysis(self):
         with self.assertRaisesRegex(ValueError, "floating"):
@@ -129,12 +155,12 @@ class NativeConversionTests(unittest.TestCase):
 
     def test_unconnected_output_port_does_not_invent_an_electrical_node(self):
         netlist = NATIVE_EXPORTED_RC + "UNCONNECTED 42\n"
-        with self.assertRaisesRegex(ValueError, "existing nonground circuit node"):
+        with self.assertRaisesRegex(ValueError, "connected|existing nonground circuit node"):
             cirsym_from_fastmean_netlist(netlist, output="UNCONNECTED")
-        with self.assertRaisesRegex(ValueError, "existing nonground circuit node"):
+        with self.assertRaisesRegex(ValueError, "connected|existing nonground circuit node"):
             cirsym_from_fastmean_netlist(netlist, output="42")
         # An unrelated unused port must not invalidate a connected probe.
-        self.assertIn("U_symbolic_output 2 0", cirsym_from_fastmean_netlist(netlist)["netlist"])
+        self.assertIn("U1 2 0", cirsym_from_fastmean_netlist(netlist)["netlist"])
 
     def test_native_port_names_are_exact_and_not_casefolded_into_another_node(self):
         with self.assertRaisesRegex(ValueError, "not a native port"):

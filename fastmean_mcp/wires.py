@@ -10,6 +10,9 @@ from __future__ import annotations
 from collections import defaultdict
 
 DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
+from .element_catalog import entries as _catalog_entries
+_NATIVE_TYPES = frozenset(entry["typeid"] for entry in _catalog_entries()
+    if entry["kind"] not in {"R","C","L","U","I"} and not entry.get("internal"))
 
 
 class WireGeometryError(ValueError):
@@ -20,7 +23,7 @@ def terminal(obj, pin):
     tid, rot = obj['Type'], obj.get('Rot', 0)
     if obj.get('FlipH', 0) or obj.get('FlipV', 0) or rot not in range(4):
         raise WireGeometryError('Unsupported flipped/rotated native wire endpoint.')
-    if tid in {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}:
+    if tid in _NATIVE_TYPES or tid in {410,420}:
         from .native_geometry import pin_positions, pin_directions
         return pin_positions(obj)[pin], pin_directions(obj)[pin]
     p = (obj['X'], obj['Y'])

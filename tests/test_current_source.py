@@ -17,14 +17,16 @@ def current_spec(waveform=None):
 
 
 class CurrentSourceTests(unittest.TestCase):
-    def test_legacy_relayout_rejects_current_source_before_writing(self):
+    def test_relayout_preserves_current_source_polarity_and_original(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);source=root/'source.scm';create_circuit(current_spec(),source)
             original=source.read_bytes();target=root/'relayout.scm'
             self.assertIn(3010,read_scheme(source)['unsupported_type_ids'])
-            with self.assertRaisesRegex(SchemeError,'R/C/L/U only'):
-                relayout_circuit(source,target)
-            self.assertFalse(target.exists())
+            relayout_circuit(source,target)
+            self.assertTrue(target.exists())
+            item=next(c for c in read_scheme(target)['components'] if c['name']=='I1')
+            self.assertEqual(item['nodes'],['0','out'])
+            self.assertEqual(item['parameters'],read_scheme(source)['components'][0]['parameters'])
             self.assertEqual(source.read_bytes(),original)
 
     def test_current_templates_do_not_retain_voltage_fields(self):

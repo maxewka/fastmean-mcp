@@ -1,5 +1,9 @@
 # Validation history
 
+Latest release reports: [1.6.0 catalog and analysis checks](VALIDATION-1.6.0.md)
+and [1.5.0 layout and installed-package checks](VALIDATION-1.5.0.md).
+The entries below retain the capabilities and limitations of their stated version.
+
 ## 1.4.0: native transformers, controlled switches and transient events
 
 Local Windows / FASTMEAN 6.1 on 2026-10-27. The full portable suite, with

@@ -10,7 +10,10 @@ from functools import lru_cache
 import math
 
 
-CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002,6101,6400,6600})
+_LEGACY_CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002,6101,6400,6600})
+CAPTION_TYPES = _LEGACY_CAPTION_TYPES
+from .element_catalog import entries as _catalog_entries
+CAPTION_TYPES |= frozenset(entry["typeid"] for entry in _catalog_entries() if entry["kind"]!="X" and not entry.get("internal"))
 
 
 def controlled_source_value(obj):
@@ -44,18 +47,25 @@ def native_component_value(obj):
         if mode == 2:
             ac = params.get("AC") or {}
             return "sine: "+_quantity(ac.get(key+"0"),unit)+" / "+_quantity(ac.get("F"),"Hz")
-        if mode == 3:
-            pulse = params.get("PULSE") or {}
-            return ("pulse: "+_quantity(pulse.get(key+"MIN"),unit)+" to "
+        if mode in {3,4}:
+            pulse = params.get("PULSE" if mode==3 else "TRIANG") or {}
+            return (("pulse: " if mode==3 else "triangle: ")+_quantity(pulse.get(key+"MIN"),unit)+" to "
                     +_quantity(pulse.get(key+"MAX"),unit)+" / "+_quantity(pulse.get("F"),"Hz"))
-        raise ValueError("Source captions require native DC, sine or pulse parameters.")
+        if mode == 5:
+            return "PWL: "+str(len(((params.get("USER") or {}).get(key) or {}).get("x") or []))+" points"
+        raise ValueError("Source captions require a known native waveform mode.")
     if obj["Type"] == 1101:
         return "Uon="+_quantity(params.get("Uon",0),"V")+"; Ron="+_quantity(params.get("Ron",0),"Ω")
     if tid == 6101:
         return "n="+_quantity(params.get("n"),"")
     if tid == 6600:
         return "Uon="+_quantity(params.get("Uon"),"V")+"; Uoff="+_quantity(params.get("Uoff"),"V")
-    return controlled_source_value(obj)
+    if tid in {6000,6001,6002,6400}:
+        return controlled_source_value(obj)
+    return "; ".join(key+"="+(_quantity(value,"") if isinstance(value,(int,float)) else
+                f"table({len(value.get('x',[]))})" if isinstance(value,dict) else
+                "["+str(len(value))+" values]" if isinstance(value,list) else str(value))
+                for key,value in list(params.items())[:3])
 
 
 def controlled_source_captions(obj, value):
@@ -67,6 +77,8 @@ def controlled_source_captions(obj, value):
 def native_component_captions(obj,value):
     """Match the engineering preview's captions for supported primitives."""
     if obj["Type"] not in CAPTION_TYPES: return []
+    if obj["Type"] not in _LEGACY_CAPTION_TYPES:
+        return _catalog_component_captions(obj,value)
     if obj["Type"] in {1000,1001,1002,2010,3010}:
         vertical = obj.get("Rot",0) in (1,3)
         x = obj["X"]+42 if vertical else obj["X"]
@@ -87,6 +99,41 @@ def native_component_captions(obj,value):
     return [{"text":str(obj.get("Name","")),"x":x,"y":y,"ha":align,
              "fontsize":10,"fontweight":"bold"},
             {"text":str(value),"x":x,"y":value_y,"ha":align,
+             "fontsize":8,"fontweight":"normal"}]
+
+
+def _catalog_component_captions(obj,value):
+    """Use a pin-free world side, including rotated and optional-pin symbols.
+
+    Extents include terminals outside the body (notably TR3 windings). A
+    four-sided symbol uses the upper-right corner, clear of every outward
+    terminal ray. The router consumes these same caption rectangles.
+    """
+    from .native_geometry import body_bounds, pin_directions, pin_positions
+    left,top,right,bottom = body_bounds(obj)
+    pins, directions = pin_positions(obj), pin_directions(obj)
+    # Generated routing reserves a twenty-unit straight lead at each pin.
+    points = list(pins.values()) + [(x+20*directions[pin][0],y+20*directions[pin][1])
+                                   for pin,(x,y) in pins.items()]
+    left = min(left,*(x for x,y in points))
+    right = max(right,*(x for x,y in points))
+    top = min(top,*(y for x,y in points))
+    bottom = max(bottom,*(y for x,y in points))
+    occupied = set(directions.values())
+    side = next((side for side in ((0,-1),(1,0),(0,1),(-1,0)) if side not in occupied),None)
+    if side == (0,-1):
+        x,y,align = (left+right)/2,top-44,"center"
+    elif side == (1,0):
+        x,y,align = right+16,(top+bottom)/2-12,"left"
+    elif side == (0,1):
+        x,y,align = (left+right)/2,bottom+24,"center"
+    elif side == (-1,0):
+        x,y,align = left-16,(top+bottom)/2-12,"right"
+    else:
+        x,y,align = right+16,top-44,"left"
+    return [{"text":str(obj.get("Name","")),"x":x,"y":y,"ha":align,
+             "fontsize":10,"fontweight":"bold"},
+            {"text":str(value),"x":x,"y":y+22,"ha":align,
              "fontsize":8,"fontweight":"normal"}]
 
 

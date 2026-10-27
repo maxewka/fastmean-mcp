@@ -28,9 +28,12 @@ all four rotations. Generated flips remain unsupported. The automatic layout
 follows the active input through the output and keeps local feedback near its
 stage. Ports remain external input/output or measurement interfaces.
 
-The symbolic and existing-file relayout adapters retain their documented
-R/C/L/U scope. `fastmean_edit_values` and generated parameter bindings do not
-edit OPAMP gain; change the JSON and generate a new circuit when changing `k`.
+In MCP 1.6.0 OPAMP is supported by both the linear CIRSYM adapter and
+existing-file relayout. Change gain in a preserved copy with
+`fastmean_edit_properties(updates={"A1":{"k":100000}})`, or bind it to a root
+parameter with `fastmean_annotate_circuit(bindings={"A1":{"k":"Gain"}},
+parameters={"Gain":100000})`. Use the actual instance name in place of A1.
+These operations do not give the ideal model physical rail or bandwidth limits.
 
 The [20-part MFB filter](../examples/mfb-filter/README.md) demonstrates three
 native op-amps with automatic placement, physical feedback wires, saved graph

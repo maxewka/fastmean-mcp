@@ -11,6 +11,7 @@ Dependencies are installed by pip, not vendored in this source repository. Their
 | MCP Python SDK | [MIT; copyright Anthropic, PBC](https://github.com/modelcontextprotocol/python-sdk/blob/main/LICENSE) |
 | PyYAML | [MIT; Ingy döt Net and Kirill Simonov](https://github.com/yaml/pyyaml/blob/main/LICENSE) |
 | Matplotlib | [Matplotlib license, based on the PSF license, and included third-party notices](https://matplotlib.org/stable/project/license.html) |
+| NumPy | [BSD-3-Clause and included third-party notices](https://github.com/numpy/numpy/blob/main/LICENSE.txt) |
 | pytest, development only | [MIT](https://github.com/pytest-dev/pytest/blob/main/LICENSE) |
 
 Pinned runtime versions are in pyproject.toml and requirements.txt. No modification to these upstream dependencies is included here.

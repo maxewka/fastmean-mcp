@@ -1,8 +1,8 @@
 """Read and author FASTMEAN 5.x text SCM files without starting FASTMEAN.
 
-Creation supports R/C/L/U/I, fixed native diode, controlled-source, ideal op-amp,
-transformer and voltage-controlled switch primitives, and named native
-subcircuit instances. Names used by the native analysis engine
+Creation supports the 44 ordinary electrical classes inventoried for native
+FASTMEAN 6.1, with typed parameter tables and named portable subcircuits.
+Names used by the native analysis engine
 are ASCII identifiers. Existing UTF-8 and Windows-1251 diagrams, including
 Russian labels, can be read without rewriting.
 
@@ -32,12 +32,21 @@ TYPE_IDS = {"R": 1000, "C": 1001, "L": 1002, "U": 2010,
 KINDS = {value: key for key, value in TYPE_IDS.items()}
 PIN_COUNTS = {1000: 2, 1001: 2, 1002: 2, 2010: 2, 3010: 2,
               1101: 2, 6000: 4, 6001: 4, 6002: 4, 6101: 4, 6400: 3, 6600: 4,
-              200: 1, 300: 4, 400: 1, 900: 0}
+              200: 1, 300: 4, 400: 1, 410: 1, 420: 1, 900: 0}
 CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "TR", "OPAMP", "SW", "X"})
 EDIT_KINDS = frozenset({"R", "C", "L", "U", "I"})
 _SIDES = ("Left", "Top", "Right", "Bottom")
 _KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X",
                  "TRANSFORMER": "TR", "VCSWITCH": "SW"}
+from .element_catalog import entries as _catalog_entries, get_element as _catalog_element
+for _entry in _catalog_entries():
+    TYPE_IDS[_entry["kind"]] = _entry["typeid"]
+    KINDS[_entry["typeid"]] = _entry["kind"]
+    if _entry["pin_count"] is not None:
+        PIN_COUNTS[_entry["typeid"]] = _entry["pin_count"]
+    for _alias in [str(_entry["typeid"]), *_entry["aliases"]]:
+        _KIND_ALIASES[_alias] = _entry["kind"]
+CREATE_KINDS = frozenset(entry["kind"] for entry in _catalog_entries() if not entry.get("internal"))
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _NUMBER = re.compile(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([A-Za-zµμА-Яа-я]*)$")
 _MULTIPLIERS = {"": 1., "k": 1e3, "K": 1e3, "M": 1e6, "meg": 1e6,
@@ -218,7 +227,12 @@ def _subcircuit_pin_names(obj: dict) -> list[str]:
 
 
 def _pin_count(obj: dict) -> int:
-    return len(_subcircuit_pin_names(obj)) if obj.get("Type") == 7100 else PIN_COUNTS.get(obj.get("Type"), 0)
+    if obj.get("Type") == 7100:
+        return len(_subcircuit_pin_names(obj))
+    if obj.get("Type") in {6901,6902,6911,6912,6913,7000}:
+        from .element_catalog import get_geometry
+        return len(get_geometry(obj["Type"],obj.get("Params"))["base_pin_positions"])
+    return PIN_COUNTS.get(obj.get("Type"), 0)
 
 
 def _summarize(document: dict, path: Path, encoding: str) -> dict:
@@ -251,6 +265,8 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                 ground = (oid, 1)
             else:
                 uf.join(ground, (oid, 1))
+        elif kind in {410,420}:
+            warnings.append(f"{obj.get('Name','')}: external DLL co-simulation contact; not an ordinary port. Native execution requires plugin bindings unsupported by this adapter.")
         elif kind == 400:
             name = str(obj.get("Name", ""))
             if not name:
@@ -275,7 +291,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                 endpoint_params = endpoint_object.get("Params") or {}
                 limit = _pin_count(endpoint_object) if endpoint_params.get("Pins") is not None else 64
             else:
-                limit = PIN_COUNTS.get(endpoint_object.get("Type"), 64)
+                limit = _pin_count(endpoint_object) if endpoint_object.get("Type") in PIN_COUNTS else 64
             if not isinstance(pin, int) or isinstance(pin, bool) or not 1 <= pin <= limit:
                 raise SchemeError(f"Invalid terminal {oid}:{pin}.")
             ends.append((oid, pin))
@@ -310,7 +326,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
     unsupported = set()
     for obj in objects:
         tid, oid = obj.get("Type"), obj["ID"]
-        if tid in {200, 300, 400, 900}:
+        if tid in {200, 300, 400, 410, 420, 900}:
             continue
         kind = KINDS.get(tid)
         native_nodes = [names[uf.find((oid, pin))] for pin in range(1, _pin_count(obj) + 1)]
@@ -329,15 +345,9 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                 item["polarity"] = "positive_current_from_node1_to_node2"
                 # Retain the legacy R/C/L/U-only symbolic/relayout guard.
                 unsupported.add(tid)
-            mode = params.get("ST")
-            active = params.get({1: "DC", 2: "AC", 3: "PULSE"}.get(mode, "")) or {}
-            quantity = "I" if current else "U"
-            item["value"] = active.get(quantity + ("MAX" if mode == 3 else "0"))
-            aliases = {quantity+"0": "amplitude", "F": "frequency", "PHI0": "phase", "Delay": "delay",
-                       "TFR": "rise_time", quantity+"MAX": "high", quantity+"MIN": "low", "K": "duty_percent"}
-            item["waveform"] = {"kind": {1: "dc", 2: "sine", 3: "pulse"}.get(mode, "unsupported"),
-                                **{public: copy.deepcopy(active[native]) for native, public in aliases.items() if native in active}}
-        elif kind in {"D", "G", "E", "F", "TR", "OPAMP", "SW", "X"}:
+            from .source_waveforms import describe_source
+            item["value"], item["waveform"] = describe_source(params, current=current)
+        elif kind in CREATE_KINDS:
             item["nodes"] = native_nodes
             # This compatibility field is also the R/C/L/U-only relayout guard.
             # Native analysis supports these objects without flattening them in
@@ -400,47 +410,8 @@ def read_scheme(path: str | Path) -> dict:
 
 
 def _source_params(value: float, waveform: dict | None, *, current: bool = False) -> dict:
-    # Exact parameter groups from bundled Type2010 U sources. ST 1/2/3 are the
-    # observed DC / sinusoidal / pulse modes in bundled examples.
-    params = {"ST": 1, "DC": {"U0": value, "Delay": 0, "TFR": "1n"},
-              "AC": {"U0": value, "F": 1000, "PHI0": 0, "FD": 0, "NP": 1, "Delay": 0},
-              "PULSE": {"F": 1000, "K": 50, "UMAX": value, "UMIN": 0, "TFR": "1n", "Delay": 0},
-              "TRIANG": {"F": 1000, "K": 50, "UMAX": value, "UMIN": 0, "Delay": 0},
-              "USER": {"ScaleT": 1, "ScaleU": 1, "OffsetU": 0, "Delay": 0, "PER": 0, "NP": 1,
-                       "U": {"x": [0, .05, .5, .55, 1], "y": [0, 1, 1, 0, 0]}}}
-    def final_parameters():
-        if not current:
-            return params
-        renames = {"U0":"I0", "UMAX":"IMAX", "UMIN":"IMIN", "ScaleU":"ScaleI", "OffsetU":"OffsetI", "U":"I"}
-        def rename(value):
-            return {renames.get(key,key):rename(item) for key,item in value.items()} if isinstance(value,dict) else value
-        return rename(params)
-    if waveform is None:
-        return final_parameters()
-    if not isinstance(waveform, dict):
-        raise SchemeError("waveform must be a mapping.")
-    kind = str(waveform.get("kind", "dc")).lower()
-    if kind not in {"dc", "sine", "pulse"}:
-        raise SchemeError("Supported voltage waveforms: dc, sine, pulse.")
-    params["ST"] = {"dc": 1, "sine": 2, "pulse": 3}[kind]
-    target = params[{"dc": "DC", "sine": "AC", "pulse": "PULSE"}[kind]]
-    aliases = {"amplitude": "U0", "frequency": "F", "phase": "PHI0", "delay": "Delay",
-               "high": "UMAX", "low": "UMIN", "duty_percent": "K", "rise_time": "TFR"}
-    for key, value_item in waveform.items():
-        if key == "kind":
-            continue
-        native_key = aliases.get(key)
-        if native_key not in target:
-            raise SchemeError(f"Unsupported {kind} waveform field: {key}")
-        numeric = parse_value(value_item)
-        if native_key in {"F", "TFR"} and numeric <= 0:
-            raise SchemeError(f"{key} must be positive.")
-        if native_key == "Delay" and numeric < 0:
-            raise SchemeError("delay cannot be negative.")
-        if native_key == "K" and not 0 < numeric < 100:
-            raise SchemeError("duty_percent must be between 0 and 100.")
-        target[native_key] = numeric
-    return final_parameters()
+    from .source_waveforms import source_parameters
+    return source_parameters(value, waveform, current=current)
 
 
 def _object(oid: int, kind: str, name: str, x: int, y: int,
@@ -622,7 +593,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             raise SchemeError("Component kind and type disagree.")
         kind = alternatives[0] if alternatives else ""
         if kind not in CREATE_KINDS:
-            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS, TR, OPAMP, SW and X.")
+            raise SchemeError(f"Generation of {kind!r} is unsupported. Call fastmean_catalog for the 44 ordinary electrical classes and their schemas.")
         name = _identifier(raw.get("name"), "Component name")
         if name.casefold() in names:
             raise SchemeError(f"Duplicate component name: {name}")
@@ -632,8 +603,10 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             allowed = {"kind", "type", "name", "model", "connections"}
         elif kind in {"D", "SW"}:
             allowed = {"kind", "type", "name", "nodes", "parameters"}
-        elif kind in {"G", "E", "F", "TR", "OPAMP"}:
+        elif kind in {"G", "E", "F", "TR", "OPAMP"} or kind not in {"R","C","L","U","I","X","D","SW"}:
             allowed = {"kind", "type", "name", "nodes", "value", "parameters"}
+        elif kind in {"U","I"}:
+            allowed.add("parameters")
         if set(raw) - allowed:
             raise SchemeError(f"{name}: unsupported component properties; model parameter overrides are not generated.")
         item = {"kind": kind, "type": kind, "name": name}
@@ -649,6 +622,25 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             terminals = [normalize_node(connections[pin]) for pin in pin_names]
             params = {"FileName": definition["path"], "Pins": copy.deepcopy(definition["pins"])}
             item.update({"model": model, "connections": dict(zip(pin_names, terminals))})
+        elif kind not in {"R","C","L","U","I","D","G","E","F","TR","OPAMP","SW"}:
+            from .element_catalog import normalize_parameters, get_geometry
+            definition = _catalog_element(kind)
+            native_patch = raw.get("parameters")
+            if "value" in raw:
+                if native_patch is not None or len(definition["defaults"]) != 1:
+                    raise SchemeError(f"{name}: supply native parameters; value is only available for one-parameter elements.")
+                native_patch = {next(iter(definition["defaults"])):raw["value"]}
+            try:
+                params = normalize_parameters(kind,native_patch)
+                geometry = get_geometry(kind,params)
+            except (ValueError,KeyError) as error:
+                raise SchemeError(f"{name}: {error}") from error
+            terminals = raw.get("nodes")
+            count = len(geometry["base_pin_positions"])
+            if not isinstance(terminals,list) or len(terminals)!=count:
+                raise SchemeError(f"{name}: {kind} needs {count} nodes in native pin order {geometry.get('pin_names')}.")
+            terminals = [normalize_node(node) for node in terminals]
+            item["parameters"] = copy.deepcopy(params)
         else:
             count = 4 if kind in {"G", "E", "F", "TR", "SW"} else 3 if kind == "OPAMP" else 2
             terminals = raw.get("nodes")
@@ -688,7 +680,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                 if kind == "TR" and (value <= 0 or terminals[0] == terminals[1] or terminals[2] == terminals[3]):
                     raise SchemeError(f"{name}: transformer requires n > 0 and distinct terminals in each winding.")
             else:
-                value = parse_value(raw.get("value"))
+                value = parse_value(raw.get("value",1 if kind in {"U","I"} and "parameters" in raw else None))
                 if kind in {"R", "C", "L"} and value <= 0:
                     raise SchemeError(f"{name}: passive values must be positive.")
                 item["value"] = value
@@ -696,6 +688,16 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                 if kind in {"U", "I"}:
                     item["waveform"] = copy.deepcopy(raw.get("waveform"))
                     params = _source_params(value, item["waveform"], current=kind == "I")
+                    if "parameters" in raw:
+                        if "waveform" in raw or "value" in raw:
+                            raise SchemeError(f"{name}: native parameters and value/waveform are alternative source specifications.")
+                        from .properties import merge_parameters
+                        params = merge_parameters(params,raw["parameters"],name)
+                        if type(params.get("ST")) is not int or params["ST"] not in range(1,6):
+                            raise SchemeError(f"{name}: native source ST must be an integer from 1 to 5.")
+                        item["parameters"] = copy.deepcopy(params)
+                        item.pop("value",None)
+                        item.pop("waveform",None)
                 elif "waveform" in raw:
                     raise SchemeError(f"{name}: waveform is only valid for independent sources.")
                 if kind in {"C", "L"}:
@@ -719,11 +721,13 @@ def _validate_interface_ports(objects: list[dict], interface_pins: dict) -> list
     by_side = {side: [] for side in _SIDES}
     side_for_rotation = {2: "Left", 3: "Top", 0: "Right", 1: "Bottom"}
     for obj in objects:
-        if obj.get("Type") != 400 or str(obj.get("Name", "")).startswith("_"):
+        if obj.get("Type") not in {400,410,420} or str(obj.get("Name", "")).startswith("_"):
             continue
         if obj.get("FlipH", 0) or obj.get("FlipV", 0):
             raise SchemeError("Generated subcircuit interface PORTs cannot be flipped.")
-        side = side_for_rotation.get(obj.get("Rot", 0))
+        rotation = obj.get("Rot",0)
+        if obj["Type"]==420:rotation=(rotation+2)%4
+        side = side_for_rotation.get(rotation)
         if side is None:
             raise SchemeError("Generated subcircuit interface PORT has an invalid rotation.")
         axis = obj.get("Y" if side in {"Left", "Right"} else "X")
@@ -745,6 +749,8 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                    interface_pins: dict | None = None) -> dict:
     """Create an electrically connected native SCM from a node-based JSON spec.
 
+    All ordinary catalog classes use native pin order and typed parameters;
+    the examples below describe the historical convenience value fields.
     R/C/L/U/I use two nodes and value. D uses [anode,cathode] and fixed
     Ron/Roff/Uon parameters; G/E/F use four native-ordered pins and a numeric
     gain. OPAMP uses [noninverting,inverting,output] with finite numeric k:
@@ -763,7 +769,7 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
     """
     if not isinstance(spec, dict) or not isinstance(spec.get("components"), list):
         raise SchemeError("Circuit spec needs a components list.")
-    if set(spec) - {"components", "ports", "analysis", "title", "name", "description", "layout"}:
+    if set(spec) - {"components", "ports", "port_types", "analysis", "title", "name", "description", "layout"}:
         raise SchemeError("Unsupported circuit-spec fields; topology is expressed by component nodes.")
     if not 1 <= len(spec["components"]) <= MAX_COMPONENTS:
         raise SchemeError(f"Circuit must contain 1 to {MAX_COMPONENTS} components.")
@@ -858,6 +864,11 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                           **({"ground_style":layout_options["ground_style"]} if "ground_style" in layout_options else {}),
                           **({"interface_pins": interface_pins} if interface_pins is not None else {}))
     objects, wires = layout["objects"], layout["wires"]
+    port_types = spec.get("port_types") or {}
+    if not isinstance(port_types,dict) or set(port_types)-set(ports):
+        raise SchemeError("port_types must map existing external aliases to analog.")
+    if any(value != "analog" for value in port_types.values()):
+        raise SchemeError("DIGITAL_IN/OUT are external DLL co-simulation contacts, not subcircuit ports. Use ordinary ports for logic and subcircuits; DLL bindings are not supported.")
     if interface_pins is not None:
         _validate_interface_ports(objects, interface_pins)
     left, top, right, bottom = layout["bounds"]
@@ -893,6 +904,7 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                          for item in normalized]
     summary["spec"] = {"components": public_components, "ports": ports, "analysis": options,
                        "layout": {**copy.deepcopy(layout_options), "density": layout["density"]}}
+    if port_types:summary["spec"]["port_types"]=copy.deepcopy(port_types)
     summary["layout"] = {key: value for key, value in layout.items() if key not in {"objects", "wires", "component_ids"}}
     summary["node_mapping"] = node_mapping
     if subcircuit:
@@ -933,26 +945,8 @@ def _apply_value_edits(document: dict, updates: dict) -> None:
                 # Validate against the complete known native template, but do
                 # not replace unrelated source modes, custom data or omitted
                 # phase/delay settings when editing one waveform field.
-                template = _source_params(value, patch["waveform"], current=kind == "I")
-                params = copy.deepcopy(obj.get("Params") or {})
-                section = {1: "DC", 2: "AC", 3: "PULSE"}[template["ST"]]
-                existing = params.get(section) or {}
-                if not isinstance(existing, dict):
-                    raise SchemeError(f"Source {name} has invalid {section} parameters.")
-                target = {**template[section], **existing}
-                quantity = "I" if kind == "I" else "U"
-                target[quantity + ("MAX" if section == "PULSE" else "0")] = value
-                aliases = {"amplitude": quantity+"0", "frequency": "F", "phase": "PHI0",
-                           "delay": "Delay", "high": quantity+"MAX", "low": quantity+"MIN",
-                           "duty_percent": "K", "rise_time": "TFR"}
-                for key in patch["waveform"] or {}:
-                    if key != "kind":
-                        native = aliases[key]
-                        # Explicit waveform amplitude/high takes precedence
-                        # over the base value, as it does during creation.
-                        target[native] = template[section][native]
-                params.update({"ST": template["ST"], section: target})
-                obj["Params"] = params
+                from .source_waveforms import patch_source
+                obj["Params"] = patch_source(obj.get("Params") or {}, value, patch["waveform"], current=kind == "I")
             else:
                 quantity = "I" if kind == "I" else "U"
                 obj.setdefault("Params", {}).setdefault("DC", {})[quantity+"0"] = value

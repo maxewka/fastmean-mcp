@@ -110,6 +110,8 @@ def _subcircuit_geometry(obj: dict, width: int, height: int):
 
 def _base_geometry(obj: dict):
     tid = obj.get("Type")
+    if tid in {1000,1001,1002,2010,3010}:
+        raise GeometryError("Legacy two-terminal geometry is handled by its existing layout/preview contract.")
     if tid == 1101:
         # Width=height=24; native pin lead adds nine units to each half-width.
         return {1: (-21, 0), 2: (21, 0)}, {1: (-1, 0), 2: (1, 0)}, (-12, -12, 12, 12)
@@ -131,7 +133,12 @@ def _base_geometry(obj: dict):
                 {1: (0, -1), 2: (0, 1), 3: (0, -1), 4: (0, 1)}, (-20, -20, 20, 20))
     if tid == 7100:
         return _subcircuit_geometry(obj, *subcircuit_size(obj))
-    raise GeometryError(f"Native geometry for component type {tid!r} is unsupported.")
+    from .element_catalog import get_geometry
+    try:
+        geometry = get_geometry(tid,obj.get("Params"))
+    except (KeyError,ValueError) as error:
+        raise GeometryError(f"Native geometry for component type {tid!r}: {error}") from error
+    return geometry["base_pin_positions"],geometry["base_pin_directions"],tuple(geometry["body_bounds"])
 
 
 def pin_positions(obj: dict) -> dict[int, tuple[int, int]]:

@@ -84,7 +84,7 @@ tool-capable model in Cline.
 
 Start a fresh client connection and ask it to call `fastmean_status`,
 `fastmean_example`, then `fastmean_create_circuit` and `fastmean_preview` on that
-example. Expected discovery: **22 tools**. For a native smoke test, run
+example. Expected discovery in 1.6.0: **29 tools**. For a native smoke test, run
 `fastmean_ac` on the RC example and inspect the returned native data/manifest.
 For nonlinear amplifiers, use `fastmean_transient`.
 
@@ -113,11 +113,16 @@ Suggested instruction for any client:
 > for annotated images and measurements through MCP, with explicit measurement
 > and display windows. Open desktop windows only on an explicit request.
 
-Authoring supports independent voltage sources `U/V` and current sources `I`
-with DC, sine or pulse waveforms. Voltage-source nodes are `[positive, negative]`;
-current-source nodes are `[from, to]` for positive current. Preview, value edits
-and root DC/sine amplitude parameter bindings include `I`. Symbolic analysis
-and `fastmean_relayout` retain their R/C/L/U scope.
+Authoring covers [44 ordinary native electrical classes](ELEMENT-CATALOG.md).
+Call `fastmean_catalog` for unfamiliar parameter names and terminal order.
+Voltage `U/V` and current `I` sources support DC, sine, pulse, triangle and PWL;
+voltage nodes are `[positive, negative]`, current nodes `[from, to]`.
+Public waveform delays are seconds. The linear symbolic adapter also supports
+controlled sources, transformers, gyrators, OPAMP, SUM and UNISTOR, including
+expanded X. Relayout uses catalog geometry and verified X interfaces. Numerical
+tools include native DC, sweeps, harmonic extraction and FFT; the separate NumPy
+spectrum tool records its different provenance. External DLL contacts and
+arbitrary SPICE imports remain outside the supported contract.
 
 Manual component, node, route and port coordinates use multiples of four;
 automatic spacing remains on 20-unit intervals. Choose

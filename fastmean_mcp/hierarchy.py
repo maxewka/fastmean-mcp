@@ -272,7 +272,7 @@ def create_project(spec: dict, destination: str | Path) -> dict:
             expected = {pin for side in SIDES for pin in definitions[name]["pins"][side]}
             if not isinstance(exposed, dict) or set(exposed) != expected:
                 raise SchemeError(f"{name}: generated native ports do not match the declared subcircuit pins.")
-            actual_order = [obj.get("Name") for obj in result.get("objects", []) if obj.get("Type") == 400]
+            actual_order = [obj.get("Name") for obj in result.get("objects", []) if obj.get("Type") in {400,410,420}]
             if actual_order != ordered_pins:
                 raise SchemeError(f"{name}: generated native PORT object order does not match the declared pin slots.")
             warnings.extend(f"{name}: {warning}" for warning in result.get("warnings", []))

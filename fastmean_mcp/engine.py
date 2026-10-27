@@ -34,7 +34,7 @@ _RENDER_LOCK = threading.Lock()
 _OWNED_LOCK = threading.Lock()
 _OWNED_PROCESSES: set[subprocess.Popen] = set()
 _UNSAFE_DIRECTIVE = re.compile(
-    r"(?i)(?<![A-Za-z0-9_])\.(?:write|include|read|save(?:_as|_netlist)?|open|cd|exit|exec|run|system)\b")
+    r"(?i)(?<![A-Za-z0-9_])\.(?:write|include|read|save(?:_as|_netlist)?|open|cd|exit|exec|run|system|dll)\b")
 _FORBIDDEN_WORDS = frozenset({"write", "include", "read", "save", "save_as", "save_netlist",
                               "open", "cd", "exit", "exec", "run", "system", "sim", "ac", "define", "set"})
 _TOKEN = re.compile(r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:[A-Za-z]+)?|[A-Za-z_][A-Za-z0-9_]*|[()+\-*/^,.]")
@@ -84,6 +84,8 @@ atexit.register(_cleanup_at_exit)
 
 def _sanitize_document(document: dict) -> None:
     for mapping in _walk(document):
+        if mapping.get(".dll") or mapping.get("Type") in {410, 420}:
+            raise EngineError("External DLL co-simulation and its DIGITAL_IN/OUT contacts require a validated plugin binding; private native jobs do not load them.")
         if mapping.get("Type") == 900:
             text = (mapping.get("Params") or {}).get("Text", "")
             if not isinstance(text, str):
@@ -139,6 +141,25 @@ def _normalize_numeric_literals(document: dict) -> list[dict]:
         "USER": ("ScaleT", "ScaleU", "ScaleI", "OffsetU", "OffsetI", "Delay", "PER", "NP")}
     for obj in document["scm"]["Scheme"].get("Objects") or []:
         params = obj.get("Params") or {}
+        from .element_catalog import get_element
+        try:
+            schema = get_element(obj.get("Type"))["parameter_schema"]
+        except KeyError:
+            schema = {}
+        for key, rule in schema.items():
+            if key not in params:
+                continue
+            shape = rule.get("type")
+            if shape in {"number","integer"}:
+                scalar(params,key,key,obj)
+            elif shape in {"number_array","integer_array"} and isinstance(params[key],list):
+                for index in range(len(params[key])):
+                    scalar(params[key],index,f"{key}[{index}]",obj)
+            elif shape == "curve" and isinstance(params[key],dict):
+                for axis in ("x","y"):
+                    if isinstance(params[key].get(axis),list):
+                        for index in range(len(params[key][axis])):
+                            scalar(params[key][axis],index,f"{key}.{axis}[{index}]",obj)
         for key in numeric_fields.get(obj.get("Type"), ()):
             if key in params:
                 scalar(params, key, key, obj)
@@ -334,13 +355,15 @@ class _ExpressionParser:
         if _IDENTIFIER.fullmatch(token):
             if token.casefold() in _FORBIDDEN_WORDS:
                 raise EngineError(f"Command keyword {token!r} is not permitted in a signal expression.")
-            if self.take("."):
+            while self.take("."):
                 if self.at >= len(self.tokens) or not _IDENTIFIER.fullmatch(self.tokens[self.at]):
                     raise EngineError("Invalid element.parameter reference.")
+                if self.tokens[self.at].casefold() in _FORBIDDEN_WORDS:
+                    raise EngineError("Command keywords cannot be parameter references.")
                 self.at += 1
             if self.take("("):
                 if self.take(")"):
-                    raise EngineError("Signal functions require an argument.")
+                    return  # Documented user-defined zero-argument function.
                 self.expression()
                 while self.take(","):
                     self.expression()
@@ -407,9 +430,13 @@ def _validate_requested_axis(rows: list[list[float]], analysis: str, request: di
     Relative tolerance accommodates the exporter's decimal rounding at any SI
     scale; a fixed absolute tolerance would accept missing tiny time intervals.
     """
-    start = request["fmin"] if analysis == "ac" else 0.0
+    start = request["fmin"] if analysis == "ac" else request.get("sample_after", 0.0)
     end = request["fmax"] if analysis == "ac" else request["stop"]
-    if not math.isclose(rows[0][0], start, rel_tol=1e-9, abs_tol=0.0):
+    filtered = analysis == "transient" and start > 0
+    if filtered:
+        if rows[0][0] < start * (1-1e-9) or rows[0][0] > start + request["step"] * (1+1e-9):
+            raise EngineError("Native write-after output does not begin within one requested step of the threshold.")
+    elif not math.isclose(rows[0][0], start, rel_tol=1e-9, abs_tol=0.0):
         raise EngineError(f"Native {analysis} axis starts at {rows[0][0]:.17g}; requested {start:.17g}.")
     if not math.isclose(rows[-1][0], end, rel_tol=1e-9, abs_tol=0.0):
         raise EngineError(f"Native {analysis} axis ends at {rows[-1][0]:.17g}; requested {end:.17g}. The calculation is incomplete or inconsistent.")
@@ -434,6 +461,7 @@ def _validate_requested_axis(rows: list[list[float]], analysis: str, request: di
             "ordering": "strictly_increasing" if analysis == "ac" else "nondecreasing",
             "repeated_timestamp_rows": sum(rows[i][0] == rows[i - 1][0] for i in range(1, len(rows))),
             "native_row_order_preserved": True,
+            "native_write_after": start if filtered else None,
             "simultaneous_samples": "retained in native order; zero-duration intervals contribute no integral"}
 
 
@@ -797,7 +825,10 @@ class Engine:
             raise EngineError(f"Could not validate/render native data: {error}. Artifacts: {job}") from error
 
     def run_ac(self, path: str | Path, signals: list[str] | None = None,
-               fmin: Any = 1, fmax: Any = 1e6, points: int = 101, scale: str = "log") -> dict:
+               fmin: Any = 1, fmax: Any = 1e6, points: int = 101, scale: str = "log", *,
+               definitions: list[dict] | None = None, overrides: dict | None = None) -> dict:
+        from .analysis import command_prelude
+        commands, directives = command_prelude(definitions, overrides)
         start, end = parse_value(fmin), parse_value(fmax)
         if start <= 0 or end <= start:
             raise EngineError("AC sweep requires 0 < fmin < fmax.")
@@ -811,8 +842,8 @@ class Engine:
         try:
             job, manifest = self._job(source, "ac", cancelled)
             self._configure_job(job, manifest, {"signals": expressions, "fmin": start, "fmax": end,
-                                                "points": points, "scale": scale})
-            self._execute(job, manifest, 'open "circuit.scm";\nwrite "native_data.txt" f ' + " ".join(expressions)
+                                                "points": points, "scale": scale, **directives})
+            self._execute(job, manifest, 'open "circuit.scm";\n' + commands + 'write "native_data.txt" f ' + " ".join(expressions)
                           + f';\nac fmin={start:.17g} fmax={end:.17g} numpts={points};\nexit;\n', cancelled)
             if cancelled.is_set():
                 raise EngineError(f"FASTMEAN request cancelled. Artifacts: {job}")
@@ -823,28 +854,93 @@ class Engine:
             self._end_request(cancelled)
 
     def run_transient(self, path: str | Path, signals: list[str] | None = None,
-                      stop: Any = .005, step: Any = 1e-6, eps: Any = 1e-5) -> dict:
+                      stop: Any = .005, step: Any = 1e-6, eps: Any = 1e-5, *,
+                      definitions: list[dict] | None = None, overrides: dict | None = None,
+                      sample_after: Any = 0, initial_conditions: str | dict = "scheme",
+                      state2scheme: bool = False) -> dict:
+        from .analysis import command_prelude, configure_initial_conditions, validate_initial_conditions
+        commands, directives = command_prelude(definitions, overrides)
+        initial_conditions = validate_initial_conditions(initial_conditions)
+        if not isinstance(state2scheme, bool):
+            raise EngineError("state2scheme must be a boolean.")
         end, dt, accuracy = parse_value(stop), parse_value(step), parse_value(eps)
+        after = parse_value(sample_after)
         if end <= 0 or dt <= 0 or dt > end:
             raise EngineError("Transient analysis requires 0 < step <= stop.")
         if end / dt > MAX_TRANSIENT_STEPS + 1e-6:
             raise EngineError(f"Transient stop/step exceeds {MAX_TRANSIENT_STEPS} steps.")
         if not 0 < accuracy <= .1:
             raise EngineError("Transient eps must satisfy 0 < eps <= 0.1.")
+        if not 0 <= after < end:
+            raise EngineError("Transient sample_after must satisfy 0 <= sample_after < stop.")
         source = Path(path).expanduser().resolve(strict=True)
         expressions = _signals(signals, source, "t")
         cancelled = self._begin_request()
+        job = manifest = None
         try:
             job, manifest = self._job(source, "transient", cancelled)
-            self._configure_job(job, manifest, {"signals": expressions, "stop": end, "step": dt, "eps": accuracy})
-            self._execute(job, manifest, 'open "circuit.scm";\nwrite "native_data.txt" t ' + " ".join(expressions)
-                          + f';\nsim tmax={end:.17g} step={dt:.17g} eps={accuracy:.17g} sv2scheme=no;\nexit;\n', cancelled)
+            self._configure_job(job, manifest, {"signals": expressions, "stop": end, "step": dt,
+                "eps": accuracy, "sample_after": after, "initial_conditions": initial_conditions,
+                "state2scheme": state2scheme, **directives})
+            configure_initial_conditions(self, job, manifest, initial_conditions)
+            write_after = f"write after {after:.17g};\n" if after else ""
+            final_state = 'save_as "final_state.scm";\n' if state2scheme else ""
+            self._execute(job, manifest, 'open "circuit.scm";\n' + commands + write_after
+                          + 'write "native_data.txt" t ' + " ".join(expressions)
+                          + f';\nsim tmax={end:.17g} step={dt:.17g} eps={accuracy:.17g} sv2scheme={"yes" if state2scheme else "no"};\n'
+                          + final_state + 'exit;\n', cancelled)
             if cancelled.is_set():
                 raise EngineError(f"FASTMEAN request cancelled. Artifacts: {job}")
-            return self._complete_data(job, manifest, expressions, "t", MAX_TRANSIENT_STEPS + 1,
-                                       cancelled=cancelled)
+            result = self._complete_data(job, manifest, expressions, "t", MAX_TRANSIENT_STEPS + 1,
+                                         cancelled=cancelled)
+            if state2scheme:
+                final = job / "final_state.scm"
+                if not final.is_file():
+                    raise EngineError(f"Native final-state SCM was not saved. Artifacts: {job}")
+                result["final_state_path"] = str(final)
+                result["final_state_sha256"] = _sha256(final)
+                manifest.update({"final_state_path": str(final), "final_state_sha256": result["final_state_sha256"]})
+                self._manifest(job, manifest)
+            return result
+        except BaseException as error:
+            if job is not None:
+                from .analysis import _failed
+                _failed(self, job, manifest, error)
+            raise
         finally:
             self._end_request(cancelled)
+
+    def run_dc(self, path: str | Path, signals: list[str] | None = None, *,
+               definitions: list[dict] | None = None, overrides: dict | None = None,
+               source_values: dict | None = None) -> dict:
+        from .analysis import run_dc
+        return run_dc(self, path, signals, definitions=definitions, overrides=overrides,
+                      source_values=source_values)
+
+    def run_parameter_sweep(self, path: str | Path, target: str, values: list,
+                            analysis: str = "transient", settings: dict | None = None,
+                            signals: list[str] | None = None, *,
+                            definitions: list[dict] | None = None, overrides: dict | None = None) -> dict:
+        from .analysis import run_parameter_sweep
+        return run_parameter_sweep(self, path, target, values, analysis, settings, signals,
+                                   definitions=definitions, overrides=overrides)
+
+    def run_spectrum(self, path: str | Path, signal: str, window: list | None = None,
+                     stop: Any = .01, step: Any = 1e-6, eps: Any = 1e-5,
+                     points: int = 4096, window_function: str = "hann", *,
+                     definitions: list[dict] | None = None, overrides: dict | None = None,
+                     initial_conditions: str | dict = "scheme") -> dict:
+        from .analysis import run_spectrum
+        return run_spectrum(self, path, signal, window, stop, step, eps, points, window_function,
+                            definitions=definitions, overrides=overrides,
+                            initial_conditions=initial_conditions)
+
+    def run_harmonics(self, path: str | Path, signal: str, frequencies: list,
+                      window: list, stop: Any = .01, step: Any = 1e-6, eps: Any = 1e-5, *,
+                      definitions: list[dict] | None = None, overrides: dict | None = None) -> dict:
+        from .analysis import run_harmonics
+        return run_harmonics(self, path, signal, frequencies, window, stop, step, eps,
+                             definitions=definitions, overrides=overrides)
 
     def export_netlist(self, path: str | Path) -> dict:
         cancelled = self._begin_request()

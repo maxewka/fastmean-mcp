@@ -1,12 +1,14 @@
 # Charts and measurements through MCP
 
-`fastmean_ac` and `fastmean_transient` already return a PNG as MCP
-`ImageContent`, together with native samples and CSV artifacts. Use
-`fastmean_plot` to make an annotated chart from a saved calculation: choose
+`fastmean_ac`, ordinary `fastmean_transient`, native FFT requests and
+`fastmean_spectrum` return PNG/CSV artifacts. `fastmean_plot` can redraw their
+registered runs as MCP `ImageContent`: choose
 signals, display and measurement windows, units, captions and reference lines.
 This creates another persistent run without starting FASTMEAN or requiring a
-separate plotting script. FASTMEAN supplies the numbers; Matplotlib in the MCP
-server renders the chart.
+separate plotting script. FASTMEAN calculates AC/transient samples and native
+FFT bins. For `spectrum`, NumPy computes rFFT/PSD from native transient samples.
+Matplotlib renders the charts; their titles, footers and provenance distinguish
+native FFT from the NumPy transform.
 
 Native runs verify the requested axis coverage before publication; AC also
 verifies the requested linear/logarithmic grid. Duplicate exported signal
@@ -66,12 +68,12 @@ For the included nominal amplifier, this workflow reproduced approximately
 
 | Argument | Meaning |
 | --- | --- |
-| `run_id` | An original, registered native AC/transient run. Find one with `fastmean_list_runs`; inspect its `columns` using `fastmean_get_result`. |
+| `run_id` | An original, registered `ac`, `transient`, `native_fft` or `spectrum` run. Find one with `fastmean_list_runs`; inspect its `columns` using `fastmean_get_result`. |
 | `panels` | A list of 1–12 panel objects. Omitted: all exported signals, provided there are at most 12. Duplicate panel signals are rejected. |
 | `display_window` | `[start, stop]` in original seconds or Hz. Omitted: the complete exported range. |
 | `measurement_window` | Independent `[start, stop]` in original seconds or Hz. Omitted: the complete exported range, even when the display window is shorter. |
 | `title`, `subtitle` | Optional plain text, up to 160 and 240 characters. Control characters are rejected. |
-| `x_unit` | Transient: `s`, `ms`, `us`; AC: `Hz`, `kHz`, `MHz`. Omitted: `s` or `Hz`. This changes displayed values and labels. |
+| `x_unit` | Transient: `s`, `ms`, `us`; AC/native FFT/NumPy spectrum: `Hz`, `kHz`, `MHz`. Omitted: `s` or `Hz`. This changes displayed values and labels. |
 
 Window bounds must be finite, increasing and completely bracketed by the
 exported data. For example, `x_unit: "ms"` still requires window bounds in
@@ -82,8 +84,8 @@ seconds: `[0.297, 0.3]`, rather than `[297, 300]`.
 | `signal` | Required exact exported column name, including case and expression spelling. |
 | `label` | Optional plain text, up to 80 characters. The native formula remains in the panel heading. |
 | `unit` | Optional plain display label, up to 24 characters. The server does not infer a formula's physical dimensions. |
-| `scale` | Finite positive display multiplier; default `1`. `display_value = native_value * scale`. |
-| `metrics` | Unique list of `rms`, `mean`, `peak`, `min`, `max`, `peak_to_peak`. Default: `["rms"]` for transient data, `[]` for AC. Use `[]` to omit measurements. |
+| `scale` | Finite positive display multiplier; default `1`. `display_value = exported_value * scale`. |
+| `metrics` | Unique list of `rms`, `mean`, `peak`, `min`, `max`, `peak_to_peak`. Default: `["rms"]` for transient data, `[]` for every frequency-domain run. Use `[]` to omit measurements. |
 | `guides` | Unique list of `mean` and/or `rms` horizontal reference lines. Each requested guide also adds that metric. Default: `[]`. |
 | `color` | Optional `#RRGGBB` color. Otherwise the server chooses from its palette. |
 
@@ -113,7 +115,7 @@ internally to avoid overflowing the square of a large finite value.
 samples and interpolated endpoints. These extrema do not estimate peaks between
 sample points. Mean native instantaneous power gives the average power over the
 selected time interval. All time-weighted metrics and guides require transient
-data; they are rejected for AC data.
+data; they are rejected for AC, native FFT and NumPy-spectrum data.
 
 Measurements use the complete window before graphical reduction. Each plotted
 panel is limited to 6,000 vertices, retaining each display bucket's minimum and
@@ -179,26 +181,105 @@ The source AC run must cover the selected 10–100,000 Hz range and contain thos
 exact columns. The chart retains the native request's logarithmic or linear
 frequency axis. Changing `x_unit` does not resample the calculation.
 
+## Native FFT and NumPy spectrum
+
+A native FFT request is a `fastmean_transient` call with FFT expressions and
+explicit native FFT settings, for example:
+
+```json
+{
+  "path": "<path-to-circuit.scm>",
+  "signals": ["MAG(FFT(U(out)))", "PH(FFT(U(out)))"],
+  "stop": 0.01,
+  "step": 0.000001,
+  "fft": {"window": [0.005, 0.009], "points": 1024, "harmonics": 40, "window_type": 0}
+}
+```
+
+Its result has `analysis: "native_fft"`. Pass that result's `run_id` to
+`fastmean_plot`; select the exact FFT expression columns, use `metrics: []`
+and choose `Hz`, `kHz` or `MHz`. FASTMEAN calculated these bins through its
+native `FFT(...)` function. Replotting verifies both `data.csv` and its
+registered `native_data.txt` source against their recorded hashes.
+
+`fastmean_spectrum` instead performs a NumPy transform of native transient data:
+
+```json
+{
+  "path": "<path-to-circuit.scm>",
+  "signal": "U(out)",
+  "window": [0.005, 0.009],
+  "stop": 0.01,
+  "step": 0.000001,
+  "points": 1024,
+  "window_function": "hann"
+}
+```
+
+Its `analysis: "spectrum"` run can be redrawn with:
+
+```json
+{
+  "run_id": "<run_id-returned-by-fastmean_spectrum>",
+  "display_window": [0, 4000],
+  "x_unit": "kHz",
+  "panels": [
+    {"signal": "amplitude_peak", "unit": "V", "metrics": []},
+    {"signal": "psd", "unit": "V²/Hz", "metrics": []}
+  ]
+}
+```
+
+The voltage labels assume the exported signal is in volts. Available spectrum
+columns are `amplitude_peak`, `phase_degrees`, `real`, `imaginary` and `psd`.
+The chart identifies NumPy rFFT/PSD and explicitly says it is **not native FFT**.
+The reader uses only the registered `spectrum.csv`; it separately authenticates
+the retained `native_transient.csv` against
+`manifest.native_transient_csv_sha256`. `fastmean_read_data` also selects the
+spectrum table rather than the retained time samples.
+
+Both transform types keep a linear frequency axis, including the zero-Hz bin.
+Changing `display_window` or frequency units neither reruns the transform nor
+changes its resolution. Line segments and optional clipped endpoints connect
+the existing exported bins. Windowing, interpolation, amplitude normalization
+and PSD normalization belong to the original transform and remain in its
+provenance. Phases of bins with negligible magnitude may be numerically
+arbitrary. Time-weighted metrics and mean/RMS guides are unavailable for these
+frequency tables.
+
+`fastmean_dc` returns a single operating-point values/CSV result; it has no
+positive time/frequency interval for `fastmean_plot`. Native final-statistic
+and `fastmean_harmonics` results likewise retain their own values/charts but
+are not accepted as replot sources here. A plot run itself is never a numeric
+source: reuse its original `source_run_id`.
+
 ## Provenance and access boundaries
 
 Each chart manifest records its source run/resource URI, source schematic
-SHA256, native-data and CSV SHA256, native engine identity/hash, original
-analysis request, normalized chart request, renderer version and output image
-hashes. The complete source CSV is SHA256-verified against the registered native
-manifest while it is read. Existing source files are preserved.
+SHA256, plotted CSV SHA256, native engine identity/hash, original analysis
+request, normalized chart request, renderer version and output image hashes.
+Native FFT also records its verified native-text source artifact. NumPy-spectrum
+provenance identifies the transform, its sampling settings and the verified
+native-transient CSV source. The complete plotted CSV is SHA256-verified against
+the registered completed analysis manifest while it is read; transform-source
+files are also hash-checked. Existing source files are preserved.
 
-Numeric sources are limited to completed, registered native AC/transient runs.
-The tool accepts no arbitrary CSV filename, URL, Python code or newly evaluated
-formula. Published-file checks reject traversal, symlinks/junctions and changed
-artifacts. Tables must have finite values, a strictly increasing AC frequency
-axis or a nondecreasing transient time axis,
-at most 31 columns, and at most 10,000 AC or 1,000,001 transient rows. Internal
+Numeric sources are limited to completed, registered `ac`, `transient`,
+`native_fft` and `spectrum` runs. Each kind has a fixed table artifact name;
+path hints cannot select another CSV. The tool accepts no arbitrary CSV
+filename, URL, Python code or newly evaluated formula. Published-file checks reject traversal, symlinks/junctions and changed
+artifacts. Tables must have finite values, a strictly increasing frequency
+axis or a nondecreasing transient time axis. AC frequencies must be positive;
+FFT/spectrum may include zero Hz. The reader allows at most 31 columns,
+10,000 AC rows, 262,145 transform-frequency rows or 1,000,001 transient rows.
+The calculation tools retain their own tighter generation limits. Internal
 verified CSV processing permits up to 256 MiB; individual public resource reads
 remain limited to 8 MiB, with large source tables available through paged
 `fastmean_read_data`. Generated SVGs also fit the 8 MiB resource limit.
 
-The chart identifies FASTMEAN as the numeric solver and Matplotlib as the
-renderer. Native application screenshots require a separate explicit action.
+The chart identifies FASTMEAN as the native solver and Matplotlib as the
+renderer; NumPy-derived spectra are separately identified. Native application
+screenshots require a separate explicit action.
 
 ## Switching events
 
