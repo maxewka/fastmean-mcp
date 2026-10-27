@@ -1,6 +1,6 @@
 # Working on FASTMEAN MCP
 
-This repository contains the adapter and an optional locale-helper source, not FASTMEAN itself. Read README.md, distribution/README.md and the relevant source before changing installation or engine behavior.
+This repository contains the MCP adapter, not FASTMEAN itself. The Russian UI installer is maintained separately at https://github.com/maxewka/fastmean-russian-ui. Read README.md, distribution/README.md and the relevant source before changing installation or engine behavior.
 
 ## When the user asks to install this MCP
 
@@ -14,7 +14,7 @@ Treat an explicit installation request as authorization to complete the normal r
 
 Use Python entry points as the primary installation path. Do not change or bypass PowerShell execution policy, App Control, Smart App Control, antivirus, UAC, registry, PATH or Windows locale. Do not add policy-bypass switches, elevation fallbacks or alternate loaders. If an enforced policy blocks an operation, report the action and the policy's stated reason.
 
-The font-fix helper is optional and separately LGPL-licensed. Do not build, download its runtime, install fonts, create shortcuts or launch it implicitly during MCP installation. For an explicit helper request, follow font-fix/README.md; if Windows blocks it, keep MCP usable and report that limitation.
+The separate Russian UI helper is optional and LGPL-licensed. Do not build, download its runtime, install fonts, create shortcuts or launch it during MCP installation. An explicit helper request belongs to its separate repository; follow that repository's instructions and respect Windows policy blocks. MCP works independently.
 
 ## Development boundaries
 

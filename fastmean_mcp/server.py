@@ -220,7 +220,10 @@ def fastmean_status() -> dict[str, Any]:
                 (installation / "symbolic" / name).is_file() for name in ("cirsymw.exe", "human.sym"))),
             "output_directory": str(output_dir()), "windows_locale_modified": False, "active_operations": active,
             "native_operations": ["AC frequency response", "transient analysis", "netlist export", "CIRSYM symbolic linear analysis"],
-            "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F/TR/SW primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
+            "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F/TR/SW/OPAMP primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
+            "opamp": {"kind": "OPAMP", "native_type": 6400,
+                      "nodes": ["noninverting", "inverting", "output"], "parameters": ["k"],
+                      "model": "Uout=k*(Uplus-Uminus), referenced to global ground; no rails, saturation, bandwidth or current limit"},
             "power_electronics": {
                 "transformer": {"kind": "TR", "native_type": 6101, "parameters": ["n"],
                     "energy_storage": "Ideal transformer; add a separate L across its primary for flyback magnetizing inductance"},

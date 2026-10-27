@@ -17,9 +17,9 @@ from typing import Any
 from .schematic import _load, _summarize, parse_value
 
 ORIGIN = "MCP schematic preview, not native screenshot"
-_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 6101, 6600, 7100}
+_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}
 _COMPONENTS = {1000: "R", 1001: "C", 1002: "L", 2010: "U", 3010: "I"}
-_NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 6101, 6600, 7100}
+_NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}
 _DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
 _RENDER_LOCK = threading.Lock()
 
@@ -117,8 +117,8 @@ def _model(source: Path) -> dict:
         elif tid == 1101:
             params = obj.get("Params") or {}
             values[oid] = "Uon=" + _quantity(params.get("Uon"), "V") + "; Ron=" + _quantity(params.get("Ron"), "Ω")
-        elif tid in {6000, 6001, 6002}:
-            key, unit = {6000: ("g", "S"), 6001: ("k", ""), 6002: ("h", "")}[tid]
+        elif tid in {6000, 6001, 6002, 6400}:
+            key, unit = {6000: ("g", "S"), 6001: ("k", ""), 6002: ("h", ""), 6400: ("k", "")}[tid]
             values[oid] = key + "=" + _quantity((obj.get("Params") or {}).get(key), unit).rstrip()
         elif tid == 6101:
             values[oid] = "n=" + _quantity((obj.get("Params") or {}).get("n"), "").rstrip()
@@ -237,6 +237,17 @@ def _draw_native_component(axis, obj, value):
         axis.add_patch(Polygon([point(-10,-10), point(-10,10), point(8)], closed=True,
                                facecolor="white", edgecolor="#161b22", linewidth=1.55, zorder=4))
         line(point(11,-12), point(11,12))  # Native pin1 anode → pin2 cathode.
+    elif tid == 6400:
+        # The triangle and its lead endpoints share the native 36x48 body.
+        # The output is a third pin, referenced internally to global ground.
+        axis.add_patch(Polygon([symbol_point(-18, -24), symbol_point(-18, 24), symbol_point(18, 0)],
+                               closed=True, facecolor="white", edgecolor="#161b22", linewidth=1.55, zorder=4))
+        for pin, edge in ((1, (-18, -8)), (2, (-18, 8)), (3, (18, 0))):
+            line(points[pin], symbol_point(*edge))
+        for y, sign in ((-8, "+"), (8, "−")):
+            x, transformed_y = symbol_point(-12, y)
+            axis.text(x, transformed_y, sign, ha="center", va="center", fontsize=8,
+                      color="#161b22", zorder=8, parse_math=False)
     elif tid == 6101:
         # Two isolated windings. The corners retain the native horizontal
         # terminal directions at (+/-24,+/-32), outside the winding body.
@@ -307,7 +318,7 @@ def _draw_native_component(axis, obj, value):
                 x, y = inset(pin, 15)
                 axis.text(x, y, str(pin), ha="center", va="center", fontsize=7,
                           color="#374151", zorder=8, parse_math=False)
-    if tid in {1101, 6000, 6001, 6002, 6101, 6600}:
+    if tid in {1101, 6000, 6001, 6002, 6101, 6400, 6600}:
         from .captions import native_component_captions
         for caption in native_component_captions(obj, value):
             caption = dict(caption)
@@ -418,6 +429,6 @@ def render_schematic(path: Path, output_dir: Path, *, include_text: bool = True)
             "port_count": sum(o["Type"] == 400 for o in objects.values()), "wire_count": len(model["segments"]),
             "junction_count": sum(o["Type"] == 300 and model["degrees"][oid] >= 3 for oid, o in objects.items()),
             "routing_waypoint_count": sum(o["Type"] == 300 and model["degrees"][oid] == 2 for oid, o in objects.items()),
-            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/TR/SW/X geometry",
+            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/TR/OPAMP/SW/X geometry",
             "approximate_wire_routes": False, "text_objects_included": include_text,
             "omitted_text_objects": omitted_text, "warnings": model["warnings"]}

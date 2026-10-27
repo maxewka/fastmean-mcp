@@ -193,6 +193,23 @@ sources use four nodes in exact native pin order and a finite numeric value
 These fields come from native saved records; they are not an arbitrary SPICE
 model interface. The symbolic and relayout adapters remain R/C/L/U only.
 
+OPAMP / operational amplifier / операционный усилитель: native Type 6400,
+three nodes [noninverting,inverting,output], finite numeric value=k or
+parameters={k}. V(output,0)=k*(V(noninverting)-V(inverting)); output reference
+is global node 0. Native ideal model: no supply pins, clipping, bandwidth,
+slew rate, noise or output-current limit; not a commercial amplifier model.
+Exact Rot0 body 36x48; pins (-26,-8),(-26,8),(26,0), input leads left/output
+right. Preview draws the native three-pin triangle with + and - inputs.
+All four rotations supported; generated flips remain unsupported. Actual
+native AC/TD checks prove positive/negative input polarity, finite-gain
+resistor feedback, and a unity follower with k=1e15. OPAMP gain editing,
+parameter binding and symbolic/relayout remain outside their current scope.
+Automatic layout follows the active input to the output, preserving local
+feedback. examples/mfb-filter provides an automatically laid out 20-part
+three-stage MFB filter, editable passive parameters and saved graph formulas.
+Reference topology is TI SLOA049D Figure B-2 (18 parts + VIN/RL test fixtures);
+nominals and ideal-opamp model are explicitly assigned test choices.
+
 Transformer / трансформатор: TR/TRANSFORMER, native Type6101, four nodes
 [p1,p2,s1,s2], value=n or parameters={n}; n=Np/Ns must be positive and finite.
 V(p1)-V(p2)=n*(V(s1)-V(s2)); dotted winding ends are native pins1 and3.

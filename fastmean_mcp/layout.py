@@ -1,4 +1,4 @@
-"""Deterministic, wire-connected layouts for native two-terminal circuits.
+"""Deterministic, wire-connected layouts for native functional stages.
 
 Signal paths run left-to-right, shunts downward, parallel paths above the main
 path. A small orthogonal router joins terminals through native CON objects.
@@ -48,24 +48,71 @@ def _object(oid, tid, name, x, y, rot=0):
             "Rot": rot, "FlipV": 0, "FlipH": 0, "active_property_page": 0}
 
 
-def _path(components: list[dict], start: str, end: str) -> tuple[list[str], list[int]]:
+def _layout_link(item):
+    """A visual stage relation, never an assertion of electrical conduction.
+
+    In particular the transformer windings remain galvanically separate in the
+    serialized circuit. The relation only keeps its input/output stages adjacent.
+    """
+    nodes = item["nodes"]
+    if len(nodes) == 2:
+        return nodes[0], nodes[1], 1, 2
+    kind = item["kind"]
+    if kind in {"G", "E", "F", "TR"}:
+        a = 0 if nodes[0] != "0" else 1
+        b = 2 if nodes[2] != "0" else 3
+        return nodes[a], nodes[b], a+1, b+1
+    if kind == "SW":
+        return nodes[2], nodes[3], 3, 4
+    if kind == "OPAMP":
+        pin = 1 if nodes[0] != "0" else 2
+        return nodes[pin-1],nodes[2],pin,3
+    if kind == "X":
+        pins = item.get("_native_params", {}).get("Pins") or {}
+        ordered = [name for side in ("Left", "Top", "Right", "Bottom") for name in pins.get(side) or []]
+        if pins.get("Left") and pins.get("Right"):
+            a, b = ordered.index(pins["Left"][0]), ordered.index(pins["Right"][0])
+            return nodes[a], nodes[b], a+1, b+1
+    return None
+
+
+def _path(components: list[dict], start: str, end: str, *, exclude_tests=False, stage_relations=True) -> tuple[list[str], list[int]]:
     graph = defaultdict(list)
+    outputs = set()
+    if stage_relations:
+        for item in components:
+            if item["kind"] in {"G","E","F","TR","SW","OPAMP"}:
+                link = _layout_link(item)
+                if link and link[1] != "0": outputs.add(link[1])
     for index, item in enumerate(components):
-        if len(item["nodes"]) != 2:
+        if exclude_tests and item["name"].startswith("_"):
             continue
-        a, b = item["nodes"]
-        if a != "0" and b != "0":
-            graph[a].append((b, index))
-            graph[b].append((a, index))
-    queue, previous = deque([start]), {start: None}
+        if not stage_relations and len(item["nodes"]) != 2:
+            continue
+        link = _layout_link(item)
+        if link is None:
+            continue
+        a, b = link[:2]
+        if a != b and a != "0" and b != "0":
+            # Feedback R/C branches attached to an active output are drawn
+            # around that stage, rather than replacing its signal path merely
+            # because the passive shortcut has fewer graph edges (MFB filters).
+            weight = 3 if item["kind"] in {"R","C","L","D"} and ({a,b}&outputs) else 1
+            graph[a].append((b,index,weight))
+            graph[b].append((a,index,weight))
+    queue, previous, costs, serial = [(0,0,start)], {start:None}, {start:0}, 0
     while queue:
-        node = queue.popleft()
+        distance,_,node = heapq.heappop(queue)
+        if distance != costs[node]: continue
         if node == end:
             break
-        for neighbor, edge in graph[node]:
-            if neighbor not in previous:
+        for neighbor,edge,weight in graph[node]:
+            cost = distance+weight
+            if cost < costs.get(neighbor,math.inf):
+                costs[neighbor] = cost
                 previous[neighbor] = (node, edge)
-                queue.append(neighbor)
+                serial += 1
+                heapq.heappush(queue,(cost,serial,neighbor))
     if end not in previous:
         return [start], []
     nodes, edges = [end], []
@@ -74,6 +121,109 @@ def _path(components: list[dict], start: str, end: str) -> tuple[list[str], list
         nodes.append(parent)
         edges.append(edge)
     return list(reversed(nodes)), list(reversed(edges))
+
+
+def _signal_spine(components, ports, options, interface_pins, *, infer):
+    nodes = {n for item in components for n in item["nodes"]}
+    source = next((c for c in components if c["kind"] == "U" and c["nodes"][1] == "0"), None)
+    start = ports.get(options.get("input"), options.get("input")) or (source["nodes"][0] if source else sorted(nodes-{"0"})[0])
+    end = ports.get(options.get("output"), options.get("output")) or ("out" if "out" in nodes else start)
+    path, edges = _path(components, start, end, exclude_tests=infer and bool(interface_pins), stage_relations=infer)
+    origin = "analysis"
+    if infer and not options.get("input"):
+        # A declared Left/Right interface expresses drawing direction even if
+        # the saved plot happens to show just the first (left) port. Do not
+        # rewrite that analysis setting to repair drawing geometry.
+        candidates = []
+        if interface_pins:
+            candidates = [(ports[a], ports[b]) for a in interface_pins.get("Left") or []
+                          for b in interface_pins.get("Right") or []]
+        if not candidates and not edges:
+            external = list(dict.fromkeys(ports.values()))
+            candidates = [(a,b) for i,a in enumerate(external) for b in external[i+1:]]
+        best = None
+        for a,b in candidates:
+            if a == b: continue
+            candidate, links = _path(components,a,b,exclude_tests=bool(interface_pins))
+            if links and (best is None or len(links) > len(best[1])):
+                best = candidate, links
+        if best is not None:
+            path, edges = best
+            start, end = path[0], path[-1]
+            origin = "interface" if interface_pins else "connected_ports"
+    return start, end, path, edges, origin
+
+
+def _branch_hubs(components, hubs, nodes, pitch, branch, extra_gap, row_gap):
+    """Keep off-spine branches near the stages to which they are connected."""
+    adjacency = defaultdict(set)
+    for component in components:
+        attached = set(component["nodes"])-{"0"}
+        # This graph is spatial only; a multiport's actual pin pairs and node
+        # identities remain untouched in schematic/native serialization.
+        for node in attached:
+            adjacency[node].update(attached-{node})
+    remaining = nodes-{"0"}-set(hubs)
+    occupancy = defaultdict(int)
+    while remaining:
+        frontier = []
+        for node in sorted(remaining):
+            known = [hubs[n] for n in sorted(adjacency[node]) if n in hubs]
+            if not known: continue
+            x = _snap(sum(p[0] for p in known)/len(known))
+            y = max(p[1] for p in known)+branch
+            anchor = x,y
+            x += occupancy[anchor]*pitch
+            occupancy[anchor] += 1
+            frontier.append((node,(x,y)))
+        if not frontier: break
+        hubs.update(frontier)
+        remaining.difference_update(n for n,p in frontier)
+    # Independent grounded islands still need a deterministic separate region.
+    for index,node in enumerate(sorted(remaining)):
+        hubs[node] = (800+(index%2)*pitch,1000+extra_gap+(index//2)*row_gap)
+
+
+def _native_symbol(item, x=0, y=0, rotation=0):
+    return {"Type":item.get("_native_type",TYPE_IDS.get(item["kind"])),"Name":item["name"],
+            "X":x,"Y":y,"Rot":rotation,"Params":item.get("_native_params") or {}}
+
+
+def _multiport_position(item, hubs, spine_edges, index):
+    from .native_geometry import pin_positions
+    native_nodes = item.get("_native_nodes",item["nodes"])
+    link = _layout_link(item) if index in spine_edges else None
+    candidates = []
+    for rotation in range(4):
+        pins = pin_positions(_native_symbol(item,rotation=rotation))
+        selected = [(pin,node) for pin,node in enumerate(native_nodes,1) if node != "0"]
+        if link:
+            selected = [(link[2],link[0]),(link[3],link[1])]
+        if not selected: continue
+        x = _snap(sum(hubs[node][0]-pins[pin][0] for pin,node in selected)/len(selected))
+        y = _snap(sum(hubs[node][1]-pins[pin][1] for pin,node in selected)/len(selected))
+        cost = sum(abs(x+pins[pin][0]-hubs[node][0])+abs(y+pins[pin][1]-hubs[node][1]) for pin,node in selected)
+        if link:
+            a,b = hubs[link[0]],hubs[link[1]]
+            pa,pb = pins[link[2]],pins[link[3]]
+            # Preserve the true native pin identities while orienting the pair
+            # along its visual signal path. Never swap electrical terminals.
+            if (b[0]-a[0])*(pb[0]-pa[0])+(b[1]-a[1])*(pb[1]-pa[1]) <= 0:
+                cost += 10000
+        candidates.append((cost,rotation,x,y))
+    if not candidates: return None
+    _,rotation,x,y = min(candidates)
+    return x,y,rotation
+
+
+def _clearance(item,x,y,rotation):
+    if item["kind"] in TYPE_IDS:
+        return x-60,y-60,x+60,y+60
+    from .native_geometry import body_bounds,pin_positions
+    obj = _native_symbol(item,x,y,rotation)
+    left,top,right,bottom = body_bounds(obj)
+    pins = list(pin_positions(obj).values())
+    return min([left-20]+[p[0]-20 for p in pins]),min([top-20]+[p[1]-20 for p in pins]),max([right+20]+[p[0]+20 for p in pins]),max([bottom+20]+[p[1]+20 for p in pins])
 
 
 def _orientation(a: tuple[int, int], b: tuple[int, int]) -> int:
@@ -145,7 +295,7 @@ class _Router:
             elif obj["Type"] in TYPE_IDS.values():
                 x, y = obj["X"], obj["Y"]
                 rectangles.append((x-20, y-20, x+20, y+20))
-            elif obj["Type"] in {1101, 6000, 6001, 6002, 6101, 6600, 7100}:
+            elif obj["Type"] in {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}:
                 from .native_geometry import body_bounds
                 rectangles.append(body_bounds(obj))
             from .captions import CAPTION_TYPES, caption_bounds, native_component_captions, native_component_value
@@ -566,15 +716,16 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
         raise LayoutError("Explicit ground routes require layout.ground_style=rail.")
     pitch, branch, shunt_pitch, extra_gap, row_gap = SPACING[density]
     nodes = set(n for item in components for n in item["nodes"])
-    source = next((c for c in components if c["kind"] == "U" and c["nodes"][1] == "0"), None)
-    start = ports.get(options.get("input"), options.get("input")) or (source["nodes"][0] if source else sorted(nodes-{"0"})[0])
-    end = ports.get(options.get("output"), options.get("output")) or ("out" if "out" in nodes else start)
-    spine_nodes, spine_edges = _path(components, start, end)
+    automatic = not any((placements,node_positions,routes,port_positions))
+    start,end,spine_nodes,spine_edges,spine_origin = _signal_spine(components,ports,options,interface_pins,infer=automatic)
     hubs = {node: (800 + index*pitch, 1000) for index, node in enumerate(spine_nodes)}
-    unresolved = sorted(nodes - {"0"} - set(hubs))
-    for index, node in enumerate(unresolved):
-        hubs[node] = (800 + (index % max(2, len(spine_nodes)))*pitch,
-                      1000 + extra_gap + (index // max(2, len(spine_nodes)))*row_gap)
+    if automatic:
+        _branch_hubs(components,hubs,nodes,pitch,branch,extra_gap,row_gap)
+    else:
+        unresolved = sorted(nodes - {"0"} - set(hubs))
+        for index, node in enumerate(unresolved):
+            hubs[node] = (800 + (index % max(2, len(spine_nodes)))*pitch,
+                          1000 + extra_gap + (index // max(2, len(spine_nodes)))*row_gap)
     def coordinate(value):
         if not isinstance(value,dict) or set(value)-{"x","y"}:
             raise LayoutError("Node coordinates require x and y only.")
@@ -586,7 +737,7 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
         if not isinstance(node_positions,dict) or set(node_positions)-nodes:
             raise LayoutError("layout.nodes must map existing circuit nodes to x/y coordinates.")
         hubs.update({net:coordinate(value) for net,value in node_positions.items()})
-    positions, used_centers = {}, set()
+    positions, used_centers, occupied = {}, set(), []
     ground_count, parallel_count = defaultdict(int), defaultdict(int)
     if placements is not None and not isinstance(placements, dict):
         raise LayoutError("layout.placements must map component names to positions.")
@@ -596,9 +747,8 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
     for index, item in enumerate(components):
         a, b = item["nodes"][:2] if len(item["nodes"]) >= 2 else (item["nodes"][0], item["nodes"][0])
         if len(item["nodes"]) != 2:
-            # Multiport internals do not define a unique signal direction.
-            # Explicit placements give the author control over functional stages.
-            x, y, rotation = 800 + (index % 4)*pitch, 1000 + (index//4)*2*branch, 0
+            preferred = _multiport_position(item,hubs,spine_edges,index) if automatic else None
+            x,y,rotation = preferred or (800+(index%4)*pitch,1000+(index//4)*2*branch,0)
         elif index in spine_edges:
             left, right = hubs[a], hubs[b]
             x, y = _snap((left[0]+right[0])/2), _snap((left[1]+right[1])/2)
@@ -615,8 +765,12 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
             parallel_count[pair] += 1
             left, right = hubs[a], hubs[b]
             x = _snap((left[0]+right[0])/2)
-            y = min(left[1], right[1]) - (count+1)*branch
-            rotation = 0 if left[0] <= right[0] else 2
+            if automatic and left[1] != right[1]:
+                y = _snap((left[1]+right[1])/2)
+                rotation = _orientation(left,right)
+            else:
+                y = min(left[1], right[1]) - (count+1)*branch
+                rotation = 0 if left[0] <= right[0] else 2
         # Public U nodes are +,-, native terminals -,+.
         if item["kind"] == "U":
             rotation = (rotation + 2) % 4
@@ -628,12 +782,33 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
             if any(isinstance(v, bool) or not isinstance(v, int) for v in (x,y,rotation)) or x % COORDINATE_STEP or y % COORDINATE_STEP or abs(x)>100000 or abs(y)>100000 or rotation not in range(4):
                 raise LayoutError("Placement coordinates must be integer multiples of 4; rotation must be 0..3.")
         def overlaps():
+            if automatic:
+                bounds = _clearance(item,x,y,rotation)
+                # Terminal escapes need one free coordinate between symbols:
+                # touching clearance edges can otherwise join unrelated nets.
+                return any(max(bounds[0],old[0]) <= min(bounds[2],old[2]) and
+                           max(bounds[1],old[1]) <= min(bounds[3],old[3]) for old in occupied)
             return any(abs(x-px)<60 and abs(y-py)<60 for px,py in used_centers)
-        while overlaps() and item["name"] not in explicit:
-            y -= branch
+        if automatic and overlaps():
+            initial = x,y
+            # Search the nearest free row/column instead of sending every
+            # colliding block upward in file order. Exact requested positions
+            # never enter this relocation pass.
+            for distance in range(1,len(components)+2):
+                candidates = [(initial[0]+dx*pitch,initial[1]+dy*branch)
+                              for dx in range(-distance,distance+1)
+                              for dy in (-(distance-abs(dx)),distance-abs(dx))]
+                candidates.sort(key=lambda p:(abs(p[0]-initial[0])+abs(p[1]-initial[1]),p[1],p[0]))
+                for x,y in candidates:
+                    if not overlaps(): break
+                if not overlaps(): break
+        else:
+            while overlaps() and item["name"] not in explicit:
+                y -= branch
         if overlaps():
             raise LayoutError("Component bodies overlap; increase explicit placement spacing.")
         used_centers.add((x,y))
+        if automatic: occupied.append(_clearance(item,x,y,rotation))
         positions[index] = (x,y,rotation)
     # Reserve an outer margin even for many parallel branches.
     shift_x = 0 if explicit else max(0, 400 - min(x for x,y,r in positions.values()))
@@ -720,6 +895,21 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
             hubs["0"] = (ground_x,ground_y)
             oid += 1
     aliases_per_net = defaultdict(int)
+    # Compact functional layouts put secondary/control ports closer to symbols.
+    # Reserve their complete default leads, including preview caption bounds.
+    port_obstacles = list(body_rectangles)+ground_rectangles
+    from .captions import CAPTION_TYPES,caption_bounds,native_component_captions,native_component_value
+    for obj in objects:
+        if obj["Type"] in CAPTION_TYPES:
+            port_obstacles.extend(caption_bounds(c) for c in native_component_captions(obj,native_component_value(obj)))
+    def port_fits(x,y,direction):
+        dx,dy = direction
+        end = x+dx*STEP,y+dy*STEP
+        left,right = min(x,end[0]),max(x,end[0])
+        top,bottom = min(y,end[1]),max(y,end[1])
+        if any(max(left,box[0]-4) <= min(right,box[2]+4) and
+               max(top,box[1]-4) <= min(bottom,box[3]+4) for box in port_obstacles): return False
+        return not any(left <= t.point[0] <= right and top <= t.point[1] <= bottom for t in terminals)
     interface_positions = {}
     if interface_pins is not None:
         sides = ("Left","Top","Right","Bottom")
@@ -772,6 +962,18 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
                 raise LayoutError("Port rotation must be 0..3.")
             direction = DIRECTIONS[rotation]
             # PORT Rot0 opens left, Rot1 up, Rot2 right, Rot3 down.
+        elif automatic and alias not in interface_positions and not port_fits(x,y,direction):
+            initial = x,y
+            for distance in range(1,len(objects)+2):
+                candidates = [(initial[0]+dx*80,initial[1]+dy*80)
+                              for dx in range(-distance,distance+1)
+                              for dy in (distance-abs(dx),-(distance-abs(dx)))]
+                candidates.sort(key=lambda p:(abs(p[0]-initial[0])+abs(p[1]-initial[1]),-p[1],p[0]))
+                for x,y in candidates:
+                    if port_fits(x,y,direction): break
+                if port_fits(x,y,direction): break
+            if not port_fits(x,y,direction):
+                raise LayoutError(f"No clear position for external port {alias!r}; provide layout.ports.")
         if alias in interface_positions and rotation != interface_positions[alias][2]:
             raise LayoutError(f"Port {alias!r} must face its declared subcircuit interface side.")
         objects.append(_object(oid,400,alias,x,y,rotation))
@@ -850,6 +1052,7 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
                      + ("local native grounds" if ground_style == "local" else "bottom ground rail")),
             "density":density,
             "ground_style":ground_style,
+            "signal_spine":spine_nodes,"spine_selection":spine_origin,
             "removed_redundant_waypoints":removed_waypoints,
             "open_pin_connector_count":len(router.open_ends),
             "requires_native_scale100":any(o["Type"]==7100 for o in objects),

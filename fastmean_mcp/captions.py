@@ -10,12 +10,12 @@ from functools import lru_cache
 import math
 
 
-CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002,6101,6600})
+CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002,6101,6400,6600})
 
 
 def controlled_source_value(obj):
     """Match the preview's compact numeric controlled-source value label."""
-    key,unit = {6000:("g","S"),6001:("k",""),6002:("h","")}[obj["Type"]]
+    key,unit = {6000:("g","S"),6001:("k",""),6002:("h",""),6400:("k","")}[obj["Type"]]
     value = (obj.get("Params") or {}).get(key,0)
     if not isinstance(value,(int,float)) or isinstance(value,bool):
         return f"{key}={value} {unit}".rstrip()
@@ -77,7 +77,7 @@ def native_component_captions(obj,value):
                  "ha":"left" if vertical else "center","fontsize":9,"fontweight":"normal"}]
     from .native_geometry import body_bounds
     left,top,right,bottom = body_bounds(obj)
-    vertical = obj.get("Rot",0) in ((1,3) if obj["Type"] in {1101,6101} else (0,2))
+    vertical = obj.get("Rot",0) in ((1,3) if obj["Type"] in {1101,6101,6400} else (0,2))
     if vertical:
         x,y,align = right+28,(top+bottom)/2-12,"left"
         value_y = y+24

@@ -20,7 +20,7 @@ def terminal(obj, pin):
     tid, rot = obj['Type'], obj.get('Rot', 0)
     if obj.get('FlipH', 0) or obj.get('FlipV', 0) or rot not in range(4):
         raise WireGeometryError('Unsupported flipped/rotated native wire endpoint.')
-    if tid in {1101, 6000, 6001, 6002, 6101, 6600, 7100}:
+    if tid in {1101, 6000, 6001, 6002, 6101, 6400, 6600, 7100}:
         from .native_geometry import pin_positions, pin_directions
         return pin_positions(obj)[pin], pin_directions(obj)[pin]
     p = (obj['X'], obj['Y'])

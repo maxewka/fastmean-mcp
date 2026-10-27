@@ -1,0 +1,31 @@
+{
+  "reference": "https://www.ti.com/lit/an/sloa049d/sloa049d.pdf",
+  "reference_figure": "B-2",
+  "reference_topology_parts": 18,
+  "test_fixture_parts": [
+    "VIN",
+    "RL"
+  ],
+  "total_parts": 20,
+  "corner_hz": 1000.0,
+  "assigned_nominals": true,
+  "native_model": "FASTMEAN ideal three-pin OPAMP, k=1e8",
+  "server_version": "1.5.0",
+  "native_executable_sha256": "a001582ada87cdf013605f43b019957ae23204ef4bfcc33be02a0681b186ee25",
+  "source_scm_sha256": "9d207b38f4a7bc909cd07489825f0c04e4d4ad05b69f4cf9b50c64dfa6dc5f45",
+  "source_preserved": true,
+  "ac_rows": 301,
+  "ac_max_absolute_complex_error": 1.5246020066348823e-12,
+  "ac_max_relative_complex_error": 1.5250096547767964e-12,
+  "ac_oracle": "Independent 9-unknown nodal linear solve, including finite op-amp gain",
+  "overall_gain_at_1khz_db": -3.002112411344328,
+  "overall_phase_at_1khz_degrees": 25.314503896866867,
+  "td_rows": 5004,
+  "td_steady_phasor_max_absolute_error": 5.3334394859546e-12,
+  "td_measurement_window_s": [
+    0.006,
+    0.01
+  ],
+  "plot_origin": "FASTMEAN native numeric exports rendered by MCP/Matplotlib",
+  "schematic_origin": "MCP drawing of SCM native pins and wires; not native screenshot"
+}

@@ -130,7 +130,7 @@ def _normalize_numeric_literals(document: dict) -> list[dict]:
                         "field": field, "original": value, "si_value": number})
 
     numeric_fields = {1000: ("R",), 1001: ("C", "IC"), 1002: ("L", "IC"),
-                      6101: ("n",), 6600: ("Uon", "Uoff", "Ron", "Roff")}
+                      6101: ("n",), 6400: ("k",), 6600: ("Uon", "Uoff", "Ron", "Roff")}
     waveform = {
         "DC": ("U0", "I0", "Delay", "TFR"),
         "AC": ("U0", "I0", "F", "PHI0", "FD", "NP", "Delay"),

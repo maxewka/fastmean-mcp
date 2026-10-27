@@ -1,6 +1,6 @@
 """Read and author FASTMEAN 5.x text SCM files without starting FASTMEAN.
 
-Creation supports R/C/L/U/I, fixed native diode, controlled-source, ideal
+Creation supports R/C/L/U/I, fixed native diode, controlled-source, ideal op-amp,
 transformer and voltage-controlled switch primitives, and named native
 subcircuit instances. Names used by the native analysis engine
 are ASCII identifiers. Existing UTF-8 and Windows-1251 diagrams, including
@@ -27,13 +27,13 @@ import yaml
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_COMPONENTS = 200
 TYPE_IDS = {"R": 1000, "C": 1001, "L": 1002, "U": 2010,
-            "D": 1101, "G": 6000, "E": 6001, "F": 6002, "TR": 6101, "SW": 6600, "X": 7100,
+            "D": 1101, "G": 6000, "E": 6001, "F": 6002, "TR": 6101, "OPAMP": 6400, "SW": 6600, "X": 7100,
             "I": 3010, "GND": 200, "CON": 300, "PORT": 400, "TEXT": 900}
 KINDS = {value: key for key, value in TYPE_IDS.items()}
 PIN_COUNTS = {1000: 2, 1001: 2, 1002: 2, 2010: 2, 3010: 2,
-              1101: 2, 6000: 4, 6001: 4, 6002: 4, 6101: 4, 6600: 4,
+              1101: 2, 6000: 4, 6001: 4, 6002: 4, 6101: 4, 6400: 3, 6600: 4,
               200: 1, 300: 4, 400: 1, 900: 0}
-CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "TR", "SW", "X"})
+CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "TR", "OPAMP", "SW", "X"})
 EDIT_KINDS = frozenset({"R", "C", "L", "U", "I"})
 _SIDES = ("Left", "Top", "Right", "Bottom")
 _KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X",
@@ -337,7 +337,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                        "TFR": "rise_time", quantity+"MAX": "high", quantity+"MIN": "low", "K": "duty_percent"}
             item["waveform"] = {"kind": {1: "dc", 2: "sine", 3: "pulse"}.get(mode, "unsupported"),
                                 **{public: copy.deepcopy(active[native]) for native, public in aliases.items() if native in active}}
-        elif kind in {"D", "G", "E", "F", "TR", "SW", "X"}:
+        elif kind in {"D", "G", "E", "F", "TR", "OPAMP", "SW", "X"}:
             item["nodes"] = native_nodes
             # This compatibility field is also the R/C/L/U-only relayout guard.
             # Native analysis supports these objects without flattening them in
@@ -346,6 +346,12 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
             if kind in {"G", "E", "F"}:
                 item["value"] = params.get({"G": "g", "E": "k", "F": "h"}[kind])
                 item["terminal_order"] = "native_pins_1_2_3_4"
+            elif kind == "OPAMP":
+                item["value"] = params.get("k")
+                item["terminal_order"] = "noninverting_inverting_output"
+                item["pin_roles"] = ["noninverting", "inverting", "output"]
+                item["voltage_relation"] = "V(output,0) = k * V(noninverting,inverting)"
+                item["model_limitations"] = "ideal gain; no supply rails, saturation, bandwidth or output-current limit"
             elif kind == "D":
                 item["terminal_order"] = "native_pins_1_2"
                 item["pin_roles"] = ["anode", "cathode"]
@@ -616,7 +622,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             raise SchemeError("Component kind and type disagree.")
         kind = alternatives[0] if alternatives else ""
         if kind not in CREATE_KINDS:
-            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS, TR, SW and X.")
+            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS, TR, OPAMP, SW and X.")
         name = _identifier(raw.get("name"), "Component name")
         if name.casefold() in names:
             raise SchemeError(f"Duplicate component name: {name}")
@@ -626,7 +632,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             allowed = {"kind", "type", "name", "model", "connections"}
         elif kind in {"D", "SW"}:
             allowed = {"kind", "type", "name", "nodes", "parameters"}
-        elif kind in {"G", "E", "F", "TR"}:
+        elif kind in {"G", "E", "F", "TR", "OPAMP"}:
             allowed = {"kind", "type", "name", "nodes", "value", "parameters"}
         if set(raw) - allowed:
             raise SchemeError(f"{name}: unsupported component properties; model parameter overrides are not generated.")
@@ -644,7 +650,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             params = {"FileName": definition["path"], "Pins": copy.deepcopy(definition["pins"])}
             item.update({"model": model, "connections": dict(zip(pin_names, terminals))})
         else:
-            count = 4 if kind in {"G", "E", "F", "TR", "SW"} else 2
+            count = 4 if kind in {"G", "E", "F", "TR", "SW"} else 3 if kind == "OPAMP" else 2
             terminals = raw.get("nodes")
             if not isinstance(terminals, list) or len(terminals) != count:
                 raise SchemeError(f"{name} must have exactly {count} node labels in native terminal order.")
@@ -669,8 +675,8 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                 if terminals[2] == terminals[3]:
                     raise SchemeError(f"{name}: switch power terminals must differ.")
                 item["parameters"] = copy.deepcopy(params)
-            elif kind in {"G", "E", "F", "TR"}:
-                key = {"G": "g", "E": "k", "F": "h", "TR": "n"}[kind]
+            elif kind in {"G", "E", "F", "TR", "OPAMP"}:
+                key = {"G": "g", "E": "k", "F": "h", "TR": "n", "OPAMP": "k"}[kind]
                 if "parameters" in raw:
                     raw_params = raw["parameters"]
                     if "value" in raw or not isinstance(raw_params, dict) or set(raw_params) != {key}:
@@ -741,7 +747,9 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
 
     R/C/L/U/I use two nodes and value. D uses [anode,cathode] and fixed
     Ron/Roff/Uon parameters; G/E/F use four native-ordered pins and a numeric
-    gain. TR uses [primary_dot,primary_undotted,secondary_dot,secondary_undotted]
+    gain. OPAMP uses [noninverting,inverting,output] with finite numeric k:
+    V(output,0)=k*V(noninverting,inverting), without supply rails or limits.
+    TR uses [primary_dot,primary_undotted,secondary_dot,secondary_undotted]
     and n=Nprimary/Nsecondary. SW uses [control+,control-,switch1,switch2] and
     Ron/Roff/Uon/Uoff parameters. The two terminal pairs remain electrically
     separate in both primitives. X instances map named

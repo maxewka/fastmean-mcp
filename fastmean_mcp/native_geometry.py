@@ -1,4 +1,4 @@
-"""Native pins for diodes, controlled sources, transformers, switches and boxes.
+"""Native pins for diodes, controlled sources, op-amps, transformers and boxes.
 
 Offsets are in SCM document units, independent of display zoom. The fixed
 geometry and rotation were checked against FASTMEAN 6.1's pin initialization
@@ -120,6 +120,11 @@ def _base_geometry(obj: dict):
         # Native IdealTrans: width 32, height 48, eight-unit leads.
         return ({1: (-24, -32), 2: (-24, 32), 3: (24, -32), 4: (24, 32)},
                 {1: (-1, 0), 2: (-1, 0), 3: (1, 0), 4: (1, 0)}, (-16, -24, 16, 24))
+    if tid == 6400:
+        # Native OPAMP: width36, height48, eight-unit leads. Native export,
+        # AC and TD confirm pin1(+), pin2(-), pin3(output referenced to 0).
+        return ({1: (-26, -8), 2: (-26, 8), 3: (26, 0)},
+                {1: (-1, 0), 2: (-1, 0), 3: (1, 0)}, (-18, -24, 18, 24))
     if tid == 6600:
         # Native VCSwitch: width=height=40; control pair at left.
         return ({1: (-16, -28), 2: (-16, 28), 3: (16, -28), 4: (16, 28)},
