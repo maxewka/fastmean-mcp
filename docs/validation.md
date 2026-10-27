@@ -1,5 +1,54 @@
 # Validation history
 
+## 1.3.1: active project topology and native open-pin connectors
+
+Local Windows / FASTMEAN6.1 on 2026-10-27: **239 passed, 5 skipped,
+308 subtests**, 100.52seconds. Portable checks with FASTMEAN absent:
+**221 passed, 23 skipped, 306 subtests**, 62.03seconds. This includes native SDK
+regressions for active subcircuit fixtures, cross-boundary loops and an open
+resistor pin. No native application or Windows settings were modified.
+
+The owned installation was upgraded normally after its dry run. Doctor
+initialized1.3.1 and discovered22 tools; all22 installed Python/data files
+matched source bytes. The installed-server SDK session independently repeated
+the corrected fixture and cross-boundary rejection. Codex configuration bytes
+remained identical during the upgrade.
+
+Two failures were reproduced through real MCP before the fix. A valid RC model
+with an underscore-prefixed test source was rejected by Python preflight even
+though native netlist expansion excluded that source. A U/C loop closed through
+the model boundary passed local checks and timed out after its requested2seconds.
+After the fix, the RC calculation completes and the cross-boundary loop is
+rejected in roughly0.1second without creating a native process.
+
+Transient preflight now follows active instance contexts. Child test-only
+components and their inactive subtrees are excluded; the same names stay active
+when that file is selected as the root. Internal nodes of repeated instances
+remain distinct, while real native ground is global. PORT rotation/coordinate
+order and the declared Pins mapping must agree before interfaces are joined.
+Unknown/flipped interfaces, native instance overrides and expansion limits
+produce explicit partial-coverage metadata. The circuit still belongs to the
+native solver; this check covers independent ideal U/C loops, not every possible
+singularity or model equation.
+
+A separate authoring regression exposed single-terminal nets being pruned and
+then rejected. A bare unwired pin also caused a native batch timeout. The manual
+page12 recommends a connector for such pins: generated schemes now retain one
+short wire and one real CON endpoint. Native AC verified zero open-branch current
+and the unchanged RC transfer function. No extra load or external PORT is used.
+
+For the sinusoidal RC fixture, native PHI0=0 uses a cosine reference. The native
+zero-state initialization/timing samples are retained. The measured transient
+deviation from the ideal cosine response was about64.3microvolt;10x finer output
+sampling and100x smaller eps did not remove it in this worker. The regression
+uses a0.1millivolt bound. AC and transient data provenance remain explicit.
+
+The complete four-BJT example was rebuilt and calculated again through actual
+MCP. All five native model instances passed the new interface checks. The root
+SCM was byte-identical to the published nominal example; the0.29–0.30s interval
+again gave25.002515V RMS,20.002012A RMS and500.100725W. Existing physical-model
+limitations remain applicable.
+
 ## 1.3.0: existing parameter edits and complete inspection pages
 
 Local Windows / FASTMEAN6.1 on 2026-10-27: **231 passed, 5 skipped,

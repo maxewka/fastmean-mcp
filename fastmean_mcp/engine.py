@@ -9,7 +9,6 @@ from __future__ import annotations
 import copy
 import csv
 import atexit
-from collections import deque
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -262,54 +261,6 @@ def prepare_copy(source: str | Path, destination: str | Path) -> Path:
     numbers; component IC values and native .define mathematics are preserved.
     """
     return _prepare_project(source, destination)[0]
-
-
-def _check_local_voltage_capacitor_loops(path: Path) -> None:
-    """Reject a documented native TD singularity without changing the circuit.
-
-    Only actual physical nodes of known independent voltage sources and
-    capacitors are used. Pure capacitor cycles are allowed. Each file is
-    checked locally; a cycle that crosses subcircuit boundaries is outside
-    this conservative preflight's scope.
-    """
-    summary = read_scheme(path)
-    capacitors, sources = [], []
-    for component in summary["components"]:
-        if component["native_type"] == 1001:
-            capacitors.append(component)
-        elif component["native_type"] == 2010:
-            sources.append(component)
-    graph: dict[str, list[tuple[str, str]]] = {}
-
-    def add(component):
-        a, b = component["nodes"]
-        graph.setdefault(a, []).append((b, component["name"]))
-        graph.setdefault(b, []).append((a, component["name"]))
-
-    for capacitor in capacitors:
-        add(capacitor)
-    for source in sorted(sources, key=lambda item: item["name"]):
-        a, b = source["nodes"]
-        pending = deque([a])
-        previous = {a: None}
-        while pending and b not in previous:
-            node = pending.popleft()
-            for neighbor, name in graph.get(node, []):
-                if neighbor not in previous:
-                    previous[neighbor] = (node, name)
-                    pending.append(neighbor)
-        if b in previous:
-            loop = [source["name"]]
-            node = b
-            while previous[node] is not None:
-                node, name = previous[node]
-                loop.append(name)
-            raise EngineError(
-                "Native transient preflight found a closed loop of ideal voltage sources and capacitors "
-                f"({', '.join(loop)}) in {path.name}. FASTMEAN does not support this transient topology; "
-                "model a finite source/internal or series resistance explicitly if physically appropriate. "
-                "No resistance was added and the source schematic was not modified. This preflight applies only to transient analysis.")
-        add(source)
 
 
 class _ExpressionParser:
@@ -615,18 +566,27 @@ class Engine:
                              "known_unicode_si_literals": "equivalent numeric SI values; listed per source model",
                              "subcircuit_models": "sanitized private copies"}})
             if analysis == "transient":
+                from .topology import TopologyError, check_transient_project
                 manifest["transient_preflight"] = {
-                    "scope": "local ideal independent voltage-source/capacitor loops in each SCM; cross-subcircuit cycles and other singularities are not checked",
                     "checked_models": [], "status": "checking"}
-                for asset in assets:
-                    private = Path(asset["private_path"])
-                    try:
-                        _check_local_voltage_capacitor_loops(private)
-                    except EngineError as error:
-                        manifest["transient_preflight"].update({"status": "rejected", "model_path": asset["source_path"]})
-                        raise EngineError(f"{error} Source model: {asset['source_path']}. Artifacts: {job}") from error
-                    manifest["transient_preflight"]["checked_models"].append(asset["source_path"])
-                manifest["transient_preflight"]["status"] = "passed"
+                origins = {Path(asset["private_path"]).resolve(): asset["source_path"] for asset in assets}
+                failure = None
+                try:
+                    report = check_transient_project(copied, assets, lambda: _check_cancelled(cancelled))
+                except TopologyError as error:
+                    failure, report = error, error.report
+                report["checked_models"] = [origins[Path(path)] for path in report["checked_models"]]
+                for ignored in report["ignored_test_components"]:
+                    ignored["model_path"] = origins[Path(ignored["model_path"])]
+                manifest["transient_preflight"] = report
+                if failure:
+                    model = origins[failure.model_path]
+                    report.update({"status": "rejected", "model_path": model, "loop": failure.loop})
+                    raise EngineError("Native transient preflight found a closed loop of ideal voltage sources and capacitors "
+                        f"({', '.join(failure.loop)}). Source model: {model}. "
+                        "FASTMEAN does not support this transient topology; model finite source/internal or series resistance "
+                        "explicitly if physically appropriate. The source circuit was not modified. "
+                        f"This preflight applies only to transient analysis. Artifacts: {job}")
             self._manifest(job, manifest)
         except Exception as error:
             manifest.update({"status": "cancelled" if cancelled is not None and cancelled.is_set() else "failed", "error": str(error)})

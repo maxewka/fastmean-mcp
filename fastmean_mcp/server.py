@@ -225,6 +225,7 @@ def fastmean_status() -> dict[str, Any]:
             "annotations": "Root numeric .parameter constants, R/C/L/U/I bindings, explanatory TEXT and saved TD/FD signal expressions in a new copy",
             "parameter_editing": "fastmean_edit_parameters updates existing finite numeric root constants, preserving bindings and descriptions; no native expression evaluation",
             "inspection": "Critical metadata plus complete byte-bounded pages; section/detail_path and expected_source_sha256 support stable reads of large fields",
+            "transient_preflight": "Active local U/C loops plus cross-instance loops with verified native PORT geometry; child underscore test components excluded; partial coverage reported in manifest",
             "plot_origin": "Matplotlib PNG rendered from the native FASTMEAN numeric export",
             "saved_data_charts": {"tool": "fastmean_plot", "max_panels": 12,
                 "input": "registered original native AC/transient run_id; exact exported columns",
@@ -262,6 +263,8 @@ def fastmean_create_circuit(spec: dict, name: str = "circuit") -> dict[str, Any]
     spec.layout.density is compact (default) or standard. Explicit coordinates
     stay unchanged; density controls automatic spacing only. ground_style is
     rail (default) or local. U nodes are [+,-]; I nodes are [from,to].
+    A single-terminal node gets one short wire and native CON endpoint, without
+    an added electrical load or external PORT.
     All names used in analysis must be ASCII. Does not open a window.
     Fixed native primitives: D uses parameters={Ron,Roff,Uon}; G/VCCS,
     E/VCVS and F/CCCS use four native-ordered nodes and a numeric value.

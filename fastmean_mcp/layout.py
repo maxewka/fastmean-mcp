@@ -126,6 +126,7 @@ class _Router:
         self.routes = routes or {}
         self.local_ground_pairs = local_ground_pairs
         self.graphs: dict[str, dict[tuple[int, int], set]] = {}
+        self.open_ends = {}
         self.reserved = {terminal.point: terminal.net for terminal in terminals}
         self.anchors = {point:net for net,point in hubs.items() if net in self.hard_hubs or net in self.routes}
         if len(self.reserved) != len(terminals):
@@ -374,6 +375,22 @@ class _Router:
             return net == "0", -len(points), tuple(points), net
         for net in sorted(grouped,key=order):
             group = sorted(grouped[net],key=lambda t:(t.point,t.direction,t.pin))
+            if len(group) == 1:
+                if net in self.routes:
+                    raise LayoutError(f"Explicit route for single-terminal node {net!r} needs another component or port endpoint.")
+                # FASTMEAN recommends a CON for an otherwise unconnected pin.
+                # Preserve this one native endpoint during leaf cleanup; a bare
+                # component pin can make the native batch worker wait on an error.
+                lead = self._expand(self._lead(group[0]))
+                if any(p in self.blocked or self._occupied(p,net) or
+                       (p in self.reserved and p != group[0].point) for p in lead[1:]):
+                    raise LayoutError(f"No room for an open-pin connector on {net!r}; move the component.")
+                graph = {}
+                self.add_path(graph,lead)
+                self.graphs[net] = graph
+                self.open_ends[net] = {lead[-1]}
+                for point,links in graph.items(): self.occupancy[point].append((net,links))
+                continue
             if net == "0" and self.local_ground_pairs:
                 graph = {}
                 for a,b in self.local_ground_pairs:
@@ -785,7 +802,7 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
     graphs = router.route()
     for net,graph in list(graphs.items()):
         graphs[net] = _prune_unused_leaves(_split_overlapping_edges(graph),
-                                          {t.point for t in terminals if t.net == net})
+                                          {t.point for t in terminals if t.net == net} | router.open_ends.get(net,set()))
     router.validate_geometry()
     wires, segments = [], []
     terminal_by_point = {t.point:t for t in terminals}
@@ -834,6 +851,7 @@ def build_layout(components: list[dict], ports: dict[str, str], options: dict,
             "density":density,
             "ground_style":ground_style,
             "removed_redundant_waypoints":removed_waypoints,
+            "open_pin_connector_count":len(router.open_ends),
             "requires_native_scale100":any(o["Type"]==7100 for o in objects),
             "bounds":[min(xs)-160,min(ys)-120,max(xs)+220,max(ys)+120],
             "positions":{o["Name"]:{"x":o["X"],"y":o["Y"],"rotation":o["Rot"]} for o in objects if o["ID"] in component_names},

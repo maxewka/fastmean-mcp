@@ -583,6 +583,61 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
 
     @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
         "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")
+    async def test_native_topology_checks_follow_active_instances_and_open_pins(self):
+        from tests.test_topology import topology_spec
+        with tempfile.TemporaryDirectory(prefix="fastmean-topology-sdk-") as temporary:
+            output=Path(temporary).resolve()
+            async with self.session(output) as client:
+                for test_fixture in (True,False):
+                    project=await self.call_success(client,"fastmean_create_project",{
+                        "spec":topology_spec(test_fixture),"name":"active_project"})
+                    source=Path(project["path"])
+                    before=source.read_bytes()
+                    if test_fixture:
+                        netlist=await self.call_success(client,"fastmean_export_netlist",{"path":str(source)})
+                        self.assertIn("STAGE.CBR",netlist["text"])
+                        self.assertNotIn("STAGE._TEST",netlist["text"])
+                        td=await self.call_success(client,"fastmean_transient",{
+                            "path":str(source),"signals":["U(IN)","U(OUT)"],"stop":.001,"step":1e-6,"eps":1e-8})
+                        rows=csv_numeric_rows(Path(td["csv_path"]))
+                        ratio=2*math.pi
+                        # Native PHI0=0 is a cosine reference, including the
+                        # solver's zero-state initialization sample at t=0.
+                        first_time=next(t for t,_,_ in rows if t>0)
+                        for t,vin,_ in rows:
+                            if t>0:self.assertAlmostEqual(vin,math.cos(2*math.pi*1000*t),
+                                delta=2*math.pi*1000*first_time+1e-10)
+                        error=max(abs(y-(math.cos(2*math.pi*1000*t)+ratio*math.sin(2*math.pi*1000*t)
+                            -math.exp(-t/.001))/(1+ratio**2)) for t,_,y in rows)
+                        # This native build has a measured harmonic-TD error
+                        # floor around64uV here, unchanged by10x finer output
+                        # sampling and100x smaller eps. The analytic comparison
+                        # therefore uses an absolute0.1mV bound.
+                        self.assertLess(error,1e-4)
+                        manifest=json.loads(Path(td["manifest_path"]).read_text(encoding="utf-8"))
+                        self.assertEqual(manifest["transient_preflight"]["ignored_test_component_count"],1)
+                    else:
+                        rejected=await client.call_tool("fastmean_transient",{
+                            "path":str(source),"signals":["U(OUT)"],"stop":.001,"step":1e-5})
+                        self.assertTrue(rejected.is_error)
+                        self.assertIn("STAGE.CBR",str(payload(rejected)))
+                        manifests=[json.loads(p.read_text(encoding="utf-8")) for p in output.glob("*_transient/manifest.json")]
+                        manifest=next(m for m in manifests if Path(m["source_path"]).resolve()==source.resolve())
+                        self.assertNotIn("owned_pid",manifest)
+                        self.assertEqual(manifest["transient_preflight"]["status"],"rejected")
+                    self.assertEqual(source.read_bytes(),before)
+                spec=await self.call_success(client,"fastmean_example",{"kind":"rc_lowpass"})
+                spec["components"].append({"kind":"R","name":"R_OPEN","nodes":["in","unused"],"value":"2k"})
+                opened=await self.call_success(client,"fastmean_create_circuit",{"spec":spec,"name":"open_pin"})
+                ac=await self.call_success(client,"fastmean_ac",{"path":opened["path"],
+                    "signals":["mag(U(out)/U(in))","mag(I(R_OPEN))"],"fmin":10,"fmax":10000,"points":5})
+                for f,mag,current in csv_numeric_rows(Path(ac["csv_path"])):
+                    self.assertAlmostEqual(mag,1/math.sqrt(1+(2*math.pi*f*.001)**2),delta=1e-9)
+                    self.assertAlmostEqual(current,0,delta=1e-12)
+                self.assertEqual((await self.call_success(client,"fastmean_status"))["active_operations"],[])
+
+    @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
+        "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")
     async def test_native_expanded_netlist_through_stdio_has_full_artifact(self):
         with tempfile.TemporaryDirectory(prefix="fastmean-mcp-netlist-") as temporary:
             output = Path(temporary).resolve()

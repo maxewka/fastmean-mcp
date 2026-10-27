@@ -15,6 +15,24 @@ class LayoutTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
+    def test_open_component_pin_uses_one_required_native_connector(self):
+        spec=example_circuit()
+        spec["components"].append({"kind":"R","name":"R_OPEN","nodes":["in","unused"],"value":"2k"})
+        result=create_circuit(spec,self.root/"open_pin.scm")
+        resistor=next(c for c in result["components"] if c["name"]=="R_OPEN")
+        unused=next(n for n in result["nodes"] if n["name"]==resistor["nodes"][1])
+        self.assertEqual(len({t["object_id"] for t in unused["terminals"]}),2)
+        self.assertIn({"object_id":resistor["native_id"],"pin":2},unused["terminals"])
+        self.assertEqual(result["layout"]["open_pin_connector_count"],1)
+        other=next(t for t in unused["terminals"] if t["object_id"] != resistor["native_id"])
+        self.assertEqual(next(o for o in result["objects"] if o["ID"]==other["object_id"])["Type"],300)
+        from fastmean_mcp.schematic import _load
+        _,document,_=_load(result["path"])
+        self.assertTrue(any(end=={"ID":resistor["native_id"],"pin":2}
+            for wire in document["scm"]["Scheme"]["Wires"] for end in wire.values()))
+        self.assertTrue(any(end=={"ID":resistor["native_id"],"pin":1}
+            for wire in document["scm"]["Scheme"]["Wires"] for end in wire.values()))
+
     def test_native_adapter_reversal_cannot_reuse_a_junction_direction(self):
         graph={(1048,860):{(1040,860),(1048,892)},
                (1040,860):{(1048,860),(1060,860)},

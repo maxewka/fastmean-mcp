@@ -378,3 +378,27 @@ before parameter edits. A deferred oversized summary item reports
 needs_detail_path; direct pages report an explicit error for oversized items.
 Reads create no files or processes. The server exposes22 MCP tools.
 See docs/PARAMETERS.md for examples, scope and limitations.
+
+Active project topology and open pins (version 1.3.1)
+---------------------------------------------------
+TD preflight follows active native instance contexts, excluding underscore test
+components and their inactive subtrees only inside instantiated models. Local
+U/C loops and loops crossing verified model interfaces are checked. Repeated
+instances retain separate internal nodes; native ground remains global.
+PORT side/rotation/coordinate order must match Pins before joining a boundary.
+Unverified/flipped interfaces, native instance overrides and expansion limits
+are reported as partial coverage in manifest.transient_preflight, with bounded
+examples and counts. This is not a complete singularity or equation analysis.
+
+A single-terminal logical node is authored with a short wire to one native CON
+endpoint, as recommended by manual page12. That required endpoint survives leaf
+cleanup; no electrical load or external PORT is added. A bare unwired pin can
+make the native worker wait on an error. Explicit routes with a single terminal
+remain unsupported and fail clearly instead of being silently discarded.
+
+The harmonic U-source phase is passed through to native PHI0. In verified6.1,
+zero phase is a cosine reference; the example uses -90degrees for a sine.
+Native zero-state initialization and timing samples remain untouched. A tested
+1kHz RC cosine fixture has about64.3uV transient error against the ideal closed
+form even after finer requested sampling/eps; do not synthesize replacement
+samples or claim tighter solver precision from requested eps alone.
