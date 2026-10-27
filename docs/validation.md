@@ -41,6 +41,13 @@ files matched source bytes, and the Codex configuration was byte-identical. A
 fresh SDK session launched from the installed environment repeated all five
 native cases with the same bounds. No Windows settings changed.
 
+The first hosted Windows run exposed an overly strict assertion in the new
+test: the native reference used an8.3 temporary-directory alias while the
+returned path used its long spelling. The test now checks actual file identity.
+The failure was reproduced locally with GetShortPathNameW, and the complete
+portable suite then passed under that short temporary alias:225 passed,
+24 skipped,306 subtests in56.90seconds. Production package bytes were unchanged.
+
 ## 1.3.1: active project topology and native open-pin connectors
 
 Local Windows / FASTMEAN6.1 on 2026-10-27: **239 passed, 5 skipped,

@@ -431,7 +431,8 @@ class EngineSafetyTests(unittest.TestCase):
             instance = next(o for o in doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
             model = Path(instance["Params"]["FileName"])
             if root == child:
-                self.assertEqual(model, private)
+                # Valid worker references can retain Windows 8.3 aliases.
+                self.assertTrue(model.samefile(private))
             else:
                 model_doc = yaml.safe_load(model.read_text(encoding="utf-8"))
                 own_instance = next(o for o in model_doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
