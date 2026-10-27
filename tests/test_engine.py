@@ -418,6 +418,33 @@ class EngineSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(EngineError, "missing"):
             prepare_copy(self.source, self.root / "missing.scm")
 
+    def test_testbench_file_cycles_pack_each_source_once_with_contextual_recursion_guard(self):
+        from fastmean_mcp.hierarchy import create_project
+        from tests.test_hierarchy import self_test_project_spec
+        project = create_project(self_test_project_spec(), self.root / "testbench")
+        source = Path(project["path"])
+        child = source.parent / "models/DEVICE.scm"
+        originals = {p: digest(p) for p in (source, child)}
+        for name, root in (("parent", source), ("standalone", child)):
+            private = prepare_copy(root, self.root / (name + ".scm"))
+            doc = yaml.safe_load(private.read_text(encoding="utf-8"))
+            instance = next(o for o in doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
+            model = Path(instance["Params"]["FileName"])
+            if root == child:
+                self.assertEqual(model, private)
+            else:
+                model_doc = yaml.safe_load(model.read_text(encoding="utf-8"))
+                own_instance = next(o for o in model_doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
+                self.assertEqual(Path(own_instance["Params"]["FileName"]), model)
+        self.assertEqual({p: digest(p) for p in originals}, originals)
+        doc = yaml.safe_load(child.read_text(encoding="utf-8"))
+        next(o for o in doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)["Name"] = "SELF"
+        child.write_text(yaml.safe_dump(doc), encoding="utf-8")
+        with self.assertRaisesRegex(EngineError, "active.*cycle"):
+            prepare_copy(source, self.root / "invalid.scm")
+        self.assertFalse((self.root / "invalid.scm").exists())
+        self.assertFalse(list(self.root.glob("invalid_assets_*")))
+
 
 _APP = Path(os.environ.get("FASTMEAN_APP_DIR", str(Path(os.environ.get("LOCALAPPDATA", "")) / "FASTMEAN 6.1")))
 _NATIVE_AVAILABLE = os.name == "nt" and (_APP / "Fastmean.exe").is_file()

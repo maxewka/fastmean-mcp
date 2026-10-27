@@ -203,7 +203,12 @@ and external pins are case-unambiguous ASCII identifiers; underscore-prefixed
 or numeric external pins are not generated. Native underscore-prefixed test
 components are preserved with a warning that parent expansion excludes them.
 There are at most 99 definitions and 32 exposed pins per definition. Missing
-models, recursive cycles, path traversal and instance parameters are rejected.
+models, active recursive cycles, path traversal and instance parameters are
+rejected. A file-reference cycle broken by a child-only underscore test instance
+is finite and supported. Only the initial root context activates test elements;
+the same file instantiated beneath itself is a child context. Project model
+metadata lists both dependencies and active_dependencies. Edited/annotated
+copies retain these references, including references to a renamed root file.
 
 Native 6.1 rebuilds a model's external interface from child PORT orientation
 and coordinates, not merely the cached parent Pins labels or object-list order.
@@ -238,7 +243,7 @@ no calculation, GUI launch or desktop automation; analysis sanitizes its own
 private working copy again before native execution.
 
 Private analysis and explicit-open copies recursively snapshot all validated
-local SCM models relative to each containing source file, reject cycles and
+local SCM models relative to each containing source file, reject active recursion and
 unvalidated external model/data fields, and retain original/private hashes.
 References inside native jobs point to private ASCII paths. open performs no
 analysis, leaves its GUI process for the user and does not automate the desktop.

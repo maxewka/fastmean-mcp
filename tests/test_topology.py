@@ -117,5 +117,19 @@ class TopologyTests(unittest.TestCase):
         self.assertIsNone(voltage_loop([("C",1,2,"C1"),("C",2,3,"C2"),("C",3,1,"C3")]))
         self.assertEqual(set(voltage_loop([("C",1,2,"C1"),("C",2,3,"C2"),("U",3,1,"U1")])),{"C1","C2","U1"})
 
+    def test_same_file_is_root_only_in_the_initial_context(self):
+        from tests.test_hierarchy import self_test_project_spec
+        path, assets = self.project(self_test_project_spec())
+        report = check_transient_project(path, assets)
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["expanded_instances"], 2)
+        self.assertEqual(report["checked_edges"], 1)
+        self.assertEqual(report["ignored_test_component_count"], 3)
+        report = check_transient_project(path.parent / "models/DEVICE.scm", assets)
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["expanded_instances"], 2)
+        self.assertEqual(report["checked_edges"], 1)
+        self.assertEqual(report["ignored_test_component_count"], 3)
+
 
 if __name__ == "__main__":unittest.main()

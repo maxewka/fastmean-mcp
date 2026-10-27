@@ -44,6 +44,32 @@ class AnnotationTests(unittest.TestCase):
         self.assertEqual(after['scm']['FD']['Expressions'], [])
         self.assertEqual(after['scm']['TD'], before['scm']['TD'])
 
+    def test_root_and_child_testbench_references_survive_renaming_and_copying(self):
+        from fastmean_mcp.hierarchy import create_project
+        from tests.test_hierarchy import self_test_project_spec
+        project = create_project(self_test_project_spec(), self.root / "testbench")
+        source = Path(project["path"])
+        child = source.parent / "models/DEVICE.scm"
+        original = {p: p.read_bytes() for p in (source, child)}
+        for name, root in (("parent", source), ("standalone", child)):
+            folder = self.root / name
+            folder.mkdir()
+            edited = folder / "renamed.scm"
+            result = annotate_circuit(root, edited, descriptions=["Copied testbench"])
+            self.assertTrue(result["source_unchanged"])
+            _, doc, _ = _load(edited)
+            instance = next(o for o in doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
+            model = (edited.parent / instance["Params"]["FileName"]).resolve()
+            if root == child:
+                self.assertEqual(model, edited)
+                self.assertEqual(result["dependency_layout"], "validated_private_assets")
+            else:
+                _, model_doc, _ = _load(model)
+                instance = next(o for o in model_doc["scm"]["Scheme"]["Objects"] if o["Type"] == 7100)
+                self.assertEqual((model.parent / instance["Params"]["FileName"]).resolve(), model)
+            prepare_copy(edited, folder / "worker.scm")
+        self.assertEqual({p: p.read_bytes() for p in original}, original)
+
     def test_parameters_notes_bindings_and_formulas_preserve_electrical_topology_and_settings(self):
         _, original, _ = _load(self.source)
         original["scm"]["TD"]["ParamSweep"] = 1

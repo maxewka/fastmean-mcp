@@ -15,7 +15,7 @@ import re
 import tempfile
 from typing import Any, Callable
 
-from .engine import MAX_MODEL_FILES, MAX_PROJECT_BYTES, MAX_SIGNALS, _dependency_path, prepare_copy, validate_signal
+from .engine import MAX_MODEL_FILES, MAX_PROJECT_BYTES, MAX_SIGNALS, _dependency_path, _validate_active_dependencies, prepare_copy, validate_signal
 from .schematic import SchemeError, _load, _summarize, _write_document, parse_value
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -36,13 +36,10 @@ def _hash(path: Path) -> str:
 
 def _snapshots(source: Path) -> dict[Path, dict]:
     records: dict[Path, dict] = {}
-    active: set[Path] = set()
     total = 0
 
     def visit(path: Path) -> None:
         nonlocal total
-        if path in active:
-            raise SchemeError("Recursive subcircuit dependency cycle.")
         if path in records:
             return
         if len(records) >= MAX_MODEL_FILES:
@@ -55,14 +52,15 @@ def _snapshots(source: Path) -> dict[Path, dict]:
         if _hash(path) != before:
             raise SchemeError(f"Source model changed while being read: {path}")
         _summarize(document, path, encoding)
-        records[path] = {"document": document, "sha256": before}
-        active.add(path)
+        records[path] = {"document": document, "sha256": before, "dependencies": []}
         for obj in document["scm"]["Scheme"].get("Objects") or []:
             if obj["Type"] == 7100:
-                visit(_dependency_path(path.parent, (obj.get("Params") or {}).get("FileName")))
-        active.remove(path)
+                child = _dependency_path(path.parent, (obj.get("Params") or {}).get("FileName"))
+                records[path]["dependencies"].append((str(obj.get("Name", "")), child))
+                visit(child)
 
     visit(source)
+    _validate_active_dependencies(source, {path: record["dependencies"] for path, record in records.items()})
     return records
 
 
@@ -236,6 +234,8 @@ def _portable_tree(records: dict, source: Path, output: Path) -> tuple[bool, str
             normalized = Path(reference.replace("\\", "/"))
             if native.drive or native.root or normalized.is_absolute() or ".." in normalized.parts:
                 return False, "Original model references are not a self-contained relative tree."
+            if output.name != source.name and _dependency_path(path.parent, reference) == source:
+                return False, "A reference to the renamed root must be relocated with its copied models."
     return True, "Original relative model paths and child bytes are preserved."
 
 

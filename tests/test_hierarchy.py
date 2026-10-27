@@ -63,6 +63,23 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def self_test_project_spec() -> dict:
+    """Finite native testbench: _SELF runs only when DEVICE is the root."""
+    sine = {"kind": "sine", "amplitude": 1, "frequency": 1000, "phase": -90}
+    return {"models": {"DEVICE": {"pins": {"Left": ["P"], "Right": ["N"]}, "circuit": {
+        "components": [
+            {"kind": "R", "name": "R1", "nodes": ["p", "n"], "value": "1k"},
+            {"kind": "X", "name": "_SELF", "model": "DEVICE", "connections": {"P": "p", "N": "n"}},
+            {"kind": "U", "name": "_DRIVE", "nodes": ["p", "0"], "value": 1, "waveform": sine},
+            {"kind": "R", "name": "_RETURN", "nodes": ["n", "0"], "value": "1k"}],
+        "ports": {"P": "p", "N": "n"}}}}, "circuit": {
+        "components": [
+            {"kind": "U", "name": "U1", "nodes": ["input", "0"], "value": 1, "waveform": sine},
+            {"kind": "X", "name": "STAGE", "model": "DEVICE", "connections": {"P": "input", "N": "output"}},
+            {"kind": "R", "name": "RL", "nodes": ["output", "0"], "value": "1k"}],
+        "ports": {"IN": "input", "OUT": "output"}, "analysis": {"input": "IN", "output": "OUT"}}}
+
+
 class HierarchyTransactions(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -144,6 +161,20 @@ class HierarchyTransactions(unittest.TestCase):
         self.assertFalse(self.destination.exists())
         self.assertEqual(sentinel.read_text(), "user data")
         self.assertEqual(list(self.root.iterdir()), [sentinel])
+
+    def test_test_only_model_cycles_are_retained_but_active_recursion_is_rejected(self):
+        spec = self_test_project_spec()
+        with patch.object(hierarchy, "create_circuit", side_effect=fake_author):
+            result = create_project(spec, self.destination)
+        self.assertEqual(result["models"][0]["dependencies"], ["DEVICE"])
+        self.assertEqual(result["models"][0]["active_dependencies"], [])
+        self.assertIn("_SELF", " ".join(result["warnings"]))
+        spec["models"]["DEVICE"]["circuit"]["components"][1]["name"] = "SELF"
+        with patch.object(hierarchy, "create_circuit") as author:
+            with self.assertRaisesRegex(SchemeError, "cycle"):
+                create_project(spec, self.root / "recursive")
+            author.assert_not_called()
+        self.assertFalse((self.root / "recursive").exists())
 
     def test_unintended_generated_test_port_cannot_change_model_interface(self):
         def unexpected_port(*args, **kwargs):

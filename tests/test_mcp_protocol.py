@@ -638,6 +638,53 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
 
     @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
         "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")
+    async def test_native_self_test_model_runs_in_parent_and_standalone_contexts(self):
+        from tests.test_hierarchy import self_test_project_spec
+        with tempfile.TemporaryDirectory(prefix="fastmean-self-test-sdk-") as temporary:
+            output = Path(temporary).resolve()
+            async with self.session(output) as client:
+                project = await self.call_success(client, "fastmean_create_project", {
+                    "spec": self_test_project_spec(), "name": "self_test"})
+                root = Path(project["path"])
+                child = root.parent / "models/DEVICE.scm"
+                originals = {p: p.read_bytes() for p in (root, child)}
+                for label, source, vin, vout, ratio in (
+                        ("parent", root, "IN", "OUT", .5),
+                        ("standalone", child, "P", "N", 2/3)):
+                    for copied in (False, True):
+                        path = source
+                        if copied:
+                            annotated = await self.call_success(client, "fastmean_annotate_circuit", {
+                                "path": str(source), "descriptions": ["Voltage gain is the ratio of output and input."],
+                                "td_signals": [f"U({vin})", f"U({vout})"],
+                                "fd_signals": [f"mag(U({vout})/U({vin}))"]})
+                            path = Path(annotated["path"])
+                        netlist = await self.call_success(client, "fastmean_export_netlist", {"path": str(path)})
+                        if label == "parent":
+                            self.assertIn("STAGE.R1", netlist["text"])
+                            self.assertNotIn("_SELF", netlist["text"])
+                            self.assertNotIn("_DRIVE", netlist["text"])
+                        else:
+                            self.assertIn("_SELF.R1", netlist["text"])
+                            self.assertNotIn("_SELF._SELF", netlist["text"])
+                            self.assertNotIn("_SELF._DRIVE", netlist["text"])
+                        ac = await self.call_success(client, "fastmean_ac", {"path": str(path),
+                            "signals": [f"mag(U({vout})/U({vin}))"], "fmin": 10, "fmax": 10000, "points": 3})
+                        for _, gain in csv_numeric_rows(Path(ac["csv_path"]), min_columns=2):
+                            self.assertAlmostEqual(gain, ratio, delta=1e-9)
+                        td = await self.call_success(client, "fastmean_transient", {"path": str(path),
+                            "signals": [f"U({vin})", f"U({vout})"], "stop": .0005, "step": 1e-5, "timeout": 10})
+                        for _, input_voltage, output_voltage in csv_numeric_rows(Path(td["csv_path"])):
+                            self.assertAlmostEqual(output_voltage, ratio*input_voltage, delta=1e-9)
+                        manifest = json.loads(Path(td["manifest_path"]).read_text(encoding="utf-8"))
+                        self.assertEqual(manifest["transient_preflight"]["expanded_instances"], 2)
+                        self.assertEqual(manifest["transient_preflight"]["ignored_test_component_count"], 3)
+                        self.assertEqual(manifest["transient_preflight"]["status"], "passed")
+                self.assertEqual({p: p.read_bytes() for p in originals}, originals)
+                self.assertEqual((await self.call_success(client, "fastmean_status"))["active_operations"], [])
+
+    @unittest.skipUnless(os.name == "nt" and NATIVE_ENABLED,
+        "Set FASTMEAN_MCP_NATIVE_TEST=1 on Windows to start native FASTMEAN")
     async def test_native_expanded_netlist_through_stdio_has_full_artifact(self):
         with tempfile.TemporaryDirectory(prefix="fastmean-mcp-netlist-") as temporary:
             output = Path(temporary).resolve()

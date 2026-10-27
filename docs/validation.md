@@ -1,5 +1,46 @@
 # Validation history
 
+## 1.3.2: finite self-test models and copied root references
+
+Local Windows / FASTMEAN6.1 on 2026-10-27: **244 passed, 5 skipped,
+308 subtests**, 111.14seconds. Portable checks with the native executable
+deliberately absent: **225 passed, 24 skipped, 306 subtests**, 56.18seconds.
+The new SDK regression runs original and annotated projects in both parent and
+standalone model contexts. Existing native hierarchy, geometry and numerical
+regressions remain included.
+
+A private SDK experiment reproduced a Python-only rejection: a child model's
+`_SELF` instance references that same file, but native parent expansion excludes
+the test instance. Native netlist export and AC proved the finite behavior. When
+selected as the root, that model includes its test instance once; inside the
+instance the same file is a child, so its own test elements are excluded.
+
+Authoring, private batch preparation, editing snapshots and transient topology
+now distinguish those contexts. File dependencies are copied once and preserved;
+active recursion still fails before any native-readable root/model is written.
+Missing models, network references and unvalidated external-data fields remain
+errors even on test-only branches. The native file graph is retained, rather
+than deleting test elements from the model.
+
+Annotation also relocates references to the root when its filename changes.
+The original root and model hashes stayed unchanged. The original relative model
+tree is retained when possible; renamed-root references use validated relative
+private references. Model metadata distinguishes all dependencies from active
+dependencies.
+
+Persistent real-SDK sessions verified gains of0.5 in the parent,2/3 in the
+standalone test,2/3 after binding the load to a2k parameter, and0.8 after editing
+that declaration to4k. The copied standalone test retained2/3. Across those five
+cases the maximum AC error was3.34e-16 and the maximum TD voltage-ratio error
+was8.05e-16V. Preview images were inspected; these are MCP drawings, not native
+screenshots.
+
+The normal installer dry run and upgrade succeeded. Doctor initialized installed
+version1.3.2, discovered22 tools and called status. All22 installed Python/data
+files matched source bytes, and the Codex configuration was byte-identical. A
+fresh SDK session launched from the installed environment repeated all five
+native cases with the same bounds. No Windows settings changed.
+
 ## 1.3.1: active project topology and native open-pin connectors
 
 Local Windows / FASTMEAN6.1 on 2026-10-27: **239 passed, 5 skipped,

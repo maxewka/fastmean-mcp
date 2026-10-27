@@ -145,10 +145,10 @@ def _validate_project(spec: dict) -> tuple[dict[str, dict], list[str]]:
             raise SchemeError(f"{name}: circuit ports must match the declared pins exactly: {sorted(expected)}.")
         definitions[name] = {"pins": pins, "circuit": circuit, "dependencies": []}
 
-    def references(circuit: Any, label: str) -> list[str]:
+    def references(circuit: Any, label: str) -> tuple[list[str], list[str]]:
         if not isinstance(circuit, dict) or not isinstance(circuit.get("components"), list):
             raise SchemeError(f"{label}: circuit needs a components list.")
-        found: set[str] = set()
+        found, active_models = set(), set()
         for component in circuit["components"]:
             if not isinstance(component, dict):
                 raise SchemeError(f"{label}: each component must be an object.")
@@ -164,11 +164,13 @@ def _validate_project(spec: dict) -> tuple[dict[str, dict], list[str]]:
             if not isinstance(connections, dict) or set(connections) != expected:
                 raise SchemeError(f"{label}.{component.get('name', '?')}: connections must map every {model} pin exactly: {sorted(expected)}.")
             found.add(model)
-        return sorted(found)
+            if not str(component.get("name", "")).startswith("_"):
+                active_models.add(model)
+        return sorted(found), sorted(active_models)
 
     references(spec.get("circuit"), "Root")
     for name, definition in definitions.items():
-        definition["dependencies"] = references(definition["circuit"], name)
+        definition["dependencies"], definition["active_dependencies"] = references(definition["circuit"], name)
     complete: set[str] = set()
     active: list[str] = []
     order: list[str] = []
@@ -179,7 +181,7 @@ def _validate_project(spec: dict) -> tuple[dict[str, dict], list[str]]:
         if name in complete:
             return
         active.append(name)
-        for child in definitions[name]["dependencies"]:
+        for child in definitions[name]["active_dependencies"]:
             visit(child)
         active.pop()
         complete.add(name)
@@ -289,6 +291,7 @@ def create_project(spec: dict, destination: str | Path) -> dict:
             stream.write(original_json)
         models = [{"name": name, "path": f"models/{name}.scm", "sha256": _hash(stage / "models" / (name + ".scm")),
                    "pins": definition["pins"], "dependencies": definition["dependencies"],
+                   "active_dependencies": definition["active_dependencies"],
                    "native_port_order": [pin for side in SIDES for pin in definition["pins"][side]]}
                   for name, definition in definitions.items()]
         files = [{"path": path.relative_to(stage).as_posix(), "sha256": _hash(path), "bytes": path.stat().st_size}

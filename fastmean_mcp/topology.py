@@ -110,8 +110,8 @@ def check_transient_project(root_path, assets, check_cancelled=lambda: None):
               "expanded_instances": 0, "checked_edges": 0, "complete": True,
               "ignored_test_component_count": 0}
 
-    def active_components(path):
-        return [c for c in records[path]["components"] if path == root or not c["name"].startswith("_")]
+    def active_components(path, root_context=False):
+        return [c for c in records[path]["components"] if root_context or not c["name"].startswith("_")]
 
     def dependency(path, instance):
         reference = Path(instance["parameters"]["FileName"].replace("\\", os.sep))
@@ -120,16 +120,16 @@ def check_transient_project(root_path, assets, check_cancelled=lambda: None):
             raise SchemeError("Transient preflight dependency escaped the prepared project.")
         return child
 
-    active, todo = set(), [root]
+    active, todo = set(), [(root, True)]
     while todo:
         check_cancelled()
-        path = todo.pop()
-        if path in active:
+        path, root_context = todo.pop()
+        if (path, root_context) in active:
             continue
-        active.add(path)
-        components = active_components(path)
+        active.add((path, root_context))
+        components = active_components(path, root_context)
         for component in records[path]["components"]:
-            if path != root and component["name"].startswith("_"):
+            if not root_context and component["name"].startswith("_"):
                 report["ignored_test_component_count"] += 1
                 if len(report["ignored_test_components"]) < 100:
                     report["ignored_test_components"].append({"model_path": str(path), "name": component["name"]})
@@ -137,8 +137,9 @@ def check_transient_project(root_path, assets, check_cancelled=lambda: None):
         loop = voltage_loop(edges)
         if loop:
             raise TopologyError(path, loop, report)
-        report["checked_models"].append(str(path))
-        todo.extend(dependency(path, c) for c in reversed(components) if c["native_type"] == 7100)
+        if str(path) not in report["checked_models"]:
+            report["checked_models"].append(str(path))
+        todo.extend((dependency(path, c), False) for c in reversed(components) if c["native_type"] == 7100)
 
     union, edges = _Union(), []
     grounded = {path: any(o["Type"] == 200 for o in summary["objects"]) for path, summary in records.items()}
@@ -151,13 +152,13 @@ def check_transient_project(root_path, assets, check_cancelled=lambda: None):
         if len(report["skipped_interfaces"]) < 100:
             report["skipped_interfaces"].append({"instance": ".".join(prefix), "reason": reason})
 
-    def expand(path, scope=(), prefix=()):
+    def expand(path, scope=(), prefix=(), root_context=False):
         check_cancelled()
         if report["expanded_instances"] >= MAX_INSTANCES or len(edges) >= MAX_EDGES:
             skip(prefix, "Preflight expansion limit reached; native circuit was not changed.")
             return
         report["expanded_instances"] += 1
-        for component in active_components(path):
+        for component in active_components(path, root_context):
             check_cancelled()
             name = (*prefix, component["name"])
             if component["native_type"] in {1001, 2010}:
@@ -173,7 +174,7 @@ def check_transient_project(root_path, assets, check_cancelled=lambda: None):
                 for port, parent_node in connections:
                     union.join(node(scope,parent_node,path), node(child_scope,records[child]["ports"][port],child))
                 expand(child, child_scope, name)
-    expand(root)
+    expand(root, root_context=True)
     report["checked_edges"] = len(edges)
     loop = voltage_loop([(kind,union.find(a),union.find(b),name) for kind,a,b,name in edges])
     if loop:

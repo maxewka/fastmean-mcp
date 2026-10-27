@@ -181,6 +181,34 @@ def _dependency_path(parent: Path, reference: Any) -> Path:
     return candidate
 
 
+def _validate_active_dependencies(root: Path, graph: dict[Path, list[tuple[str, Path]]],
+                                  check_cancelled=lambda: None) -> None:
+    """A file graph may cycle when a child-only test instance breaks expansion.
+
+    Only the initial context includes underscore-prefixed test elements. The
+    same file instantiated below itself is a child context, not another root.
+    """
+    complete, active = set(), []
+
+    def visit(path, root_context=False):
+        check_cancelled()
+        context = (path, root_context)
+        if context in active:
+            cycle = active[active.index(context):] + [context]
+            raise EngineError("Recursive active subcircuit dependency cycle: " +
+                              " -> ".join(str(item[0]) for item in cycle))
+        if context in complete:
+            return
+        active.append(context)
+        for name, child in graph[path]:
+            if root_context or not name.startswith("_"):
+                visit(child)
+        active.pop()
+        complete.add(context)
+
+    visit(root, True)
+
+
 def _prepare_project(source: str | Path, destination: str | Path,
                      cancelled: threading.Event | None = None) -> tuple[Path, list[dict]]:
     original = Path(source).expanduser().resolve(strict=True)
@@ -190,7 +218,6 @@ def _prepare_project(source: str | Path, destination: str | Path,
     if target.exists() or target.is_symlink():
         raise EngineError(f"Private schematic destination already exists: {target}")
     records: dict[Path, dict] = {}
-    active: set[Path] = set()
     total_bytes = 0
     asset_root = target.parent / (target.stem + "_assets_" + uuid4().hex[:8])
 
@@ -198,8 +225,6 @@ def _prepare_project(source: str | Path, destination: str | Path,
         nonlocal total_bytes
         if cancelled is not None and cancelled.is_set():
             raise EngineError("FASTMEAN request was cancelled during project preparation.")
-        if path in active:
-            raise EngineError(f"Recursive subcircuit dependency cycle: {path}")
         if path in records:
             return
         if len(records) >= MAX_MODEL_FILES:
@@ -216,8 +241,7 @@ def _prepare_project(source: str | Path, destination: str | Path,
         normalizations = _normalize_numeric_literals(document)
         private = target if path == original else asset_root / f"model_{len(records):03d}.scm"
         records[path] = {"document": document, "private_path": private, "source_sha256": before,
-                         "numeric_normalizations": normalizations}
-        active.add(path)
+                         "numeric_normalizations": normalizations, "dependencies": []}
         for obj in document["scm"]["Scheme"].get("Objects") or []:
             params = obj.get("Params") or {}
             for mapping in _walk(params):
@@ -227,13 +251,15 @@ def _prepare_project(source: str | Path, destination: str | Path,
                             raise EngineError(f"Unvalidated external model/data field {obj.get('Name')}.{key}; cannot safely relocate this project.")
             if obj.get("Type") == 7100:
                 dependency = _dependency_path(path.parent, params.get("FileName"))
+                records[path]["dependencies"].append((str(obj.get("Name", "")), dependency))
                 visit(dependency)
                 # Absolute private ASCII paths remove dependence on FASTMEAN's
                 # ambiguous current-directory changes when loading nested models.
                 params["FileName"] = str(records[dependency]["private_path"])
-        active.remove(path)
 
     visit(original)
+    _validate_active_dependencies(original, {path: record["dependencies"] for path, record in records.items()},
+                                  lambda: _check_cancelled(cancelled))
     # All dependency validation finishes before any native-readable file is made.
     if len(records) > 1:
         asset_root.mkdir(exist_ok=False)
@@ -256,8 +282,9 @@ def prepare_copy(source: str | Path, destination: str | Path) -> Path:
 
     All original files remain unchanged. Repeated and relative Type-7100 models
     are copied, validated and sanitized; references point to the private models.
-    Network, cyclic, missing or unvalidated external-data references fail before
-    native execution. Known numeric Unicode SI literals become equivalent SI
+    Network, actively recursive, missing or unvalidated external-data references
+    fail before native execution. Test-only file cycles are packaged intact.
+    Known numeric Unicode SI literals become equivalent SI
     numbers; component IC values and native .define mathematics are preserved.
     """
     return _prepare_project(source, destination)[0]
