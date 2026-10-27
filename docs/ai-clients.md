@@ -84,7 +84,7 @@ tool-capable model in Cline.
 
 Start a fresh client connection and ask it to call `fastmean_status`,
 `fastmean_example`, then `fastmean_create_circuit` and `fastmean_preview` on that
-example. Expected discovery: **21 tools**. For a native smoke test, run
+example. Expected discovery: **22 tools**. For a native smoke test, run
 `fastmean_ac` on the RC example and inspect the returned native data/manifest.
 For nonlinear amplifiers, use `fastmean_transient`.
 

@@ -354,3 +354,27 @@ digest. Inline PNGs use the same registered-artifact checks as resource reads;
 modified files are rejected. Long plot panel captions wrap separately from
 metric summaries. Symbolic probes must be electrically connected, and missing
 CIRSYM executable/settings files are reported before native netlist export.
+
+Parameter editing and complete inspection (version 1.3.0)
+-------------------------------------------------------
+fastmean_edit_parameters(path, updates, expected_source_sha256?) changes existing
+finite numeric root .parameter/.param literal spans in a new portable project.
+Names are case-sensitive. Labels/comments/other TEXT, direct component bindings,
+TD/FD formulas, wires and child model files are preserved. No calculation runs;
+existing descriptive prose retains its original wording. Expressions as targets,
+duplicates, overriding define/global/set names and conflicting child globals are
+rejected. Known direct passive/source range constraints are checked; arbitrary
+derived expressions and instance parameter overrides are not evaluated.
+
+fastmean_inspect returns root_parameters and critical metadata independently of
+verbose component data. Compact components omit raw Params. Use section with
+offset/limit to read complete components/nodes/objects/texts/ports/parameters/
+analysis/wires/warnings/parameter_issues; follow each page's next_offset.
+detail_path selects nested native mapping keys/list indices, including large
+USER waveform arrays and TEXT character chunks. Responses contain complete
+entries within 128KiB UTF-8 JSON, never recursive fragments of native objects.
+Reuse source_sha256 as expected_source_sha256 to reject saves between pages or
+before parameter edits. A deferred oversized summary item reports
+needs_detail_path; direct pages report an explicit error for oversized items.
+Reads create no files or processes. The server exposes22 MCP tools.
+See docs/PARAMETERS.md for examples, scope and limitations.

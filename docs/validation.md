@@ -1,5 +1,52 @@
 # Validation history
 
+## 1.3.0: existing parameter edits and complete inspection pages
+
+Local Windows / FASTMEAN6.1 on 2026-10-27: **231 passed, 5 skipped,
+304 subtests**, 93.62seconds. The portable suite with the executable deliberately
+absent passed **214 tests, 22 skipped, 302 subtests**, 54.68seconds. Subsequent
+targeted parameter checks covered numeric underflow/extreme exponents and
+unsupported parameter-function syntax: **6 passed, 18 subtests**. Platform and
+existing policy skips remain; no Windows settings changed.
+
+The normal installer upgraded the owned environment to1.3.0 after a dry run.
+Doctor initialized the installed package, discovered22 tools and called status;
+all21 installed Python/data files matched the reviewed source. A separate
+installed-server stdio session inspected and edited an amplifier parameter,
+retaining all12 direct bindings. Configuration semantics and unrelated settings
+were preserved; the installer retained its configuration backup.
+
+`fastmean_edit_parameters` changes existing root numeric declaration spans,
+retaining quoted labels, comments, CRLF, direct component bindings, all other
+TEXT, wires, analysis settings and recursive models. It rejects ambiguous or
+overridden targets, nonliteral expressions, invalid direct passive/source ranges
+and values that would silently underflow to zero. Source/model snapshots are
+checked before publication. The optional expected source digest detects a
+resave after inspection. See [the API guide](PARAMETERS.md).
+
+`fastmean_inspect` now uses actual UTF-8 byte budgets and complete paged entries.
+The amplifier summary includes all **36 components, 23 nodes, four ports,
+seven constants, 12 direct bindings, 11 TEXT objects and five saved TD formulas**
+in about33KiB. `include_objects` adds a separate raw-object page. Selected
+sections and nested `detail_path` reads can recover large native waveform arrays
+or text chunks without recursive cuts. Snapshot hashes prevent mixing pages
+from different saves. Inspection creates no files or native processes.
+
+The official MCP SDK stdio workflow discovered **22 tools**, created and
+annotated an RC filter, changed `R0` from1k to2k, inspected its retained binding,
+ran native AC and transient, then returned a plot through MCP. Independent
+equations gave the new cutoff **79.57747154595Hz**. Maximum AC magnitude error
+was **6.67e-16**; transient deviation from the ideal step response was
+**2.50e-7V**, consistent with the source's finite rise time. The returned chart
+was visually checked. No direct implementation calls authored those deliverables.
+
+The same MCP workflow edited the amplifier's `Rload`, shared `Rf` and `Vrail`,
+retained all12 bindings and four model files, and exported the native expanded
+netlist. FASTMEAN confirmed2ohm load, both3k feedback resistors and both40V
+supply source values. This is a separate variation; no25V/500W result is claimed
+for those changed settings. The original nominal example and model hashes
+remained intact. Hosted CI is separate from these local checks.
+
 ## 1.2.1: preservation, result integrity and native failure detection
 
 Local Windows / FASTMEAN 6.1 on 2026-10-27: **220 passed, 5 skipped,

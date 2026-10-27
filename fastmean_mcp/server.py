@@ -32,6 +32,8 @@ from .symbolic import cirsym_from_fastmean_netlist, run_symbolic
 PROJECT = Path(__file__).resolve().parent.parent
 INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis. Start with status and example. Create circuits with adjacent components and real orthogonal wires; ports are external interfaces only. create_project builds portable native subcircuits from named fixed numeric definitions and complete pin connections; edit its saved project.spec.json and regenerate a new project to change definitions. Native instance parameter overrides are unsupported. annotate_circuit adds root numeric parameters, supported component bindings, explanatory text and saved TD/FD expressions to a new portable copy. Use relayout for old R/C/L/U port-stub circuits; preview returns a schematic PNG/SVG for supported geometry. AC/transient PNGs render native numerical data. Use plot on an original native run_id for saved-data PNG/SVG charts, separate display and measurement windows, units and time-weighted RMS/mean/peak; no plotting scripts or new simulation are needed. Symbolic CIRSYM supports linear zero-state R/C/L and one voltage source, not arbitrary CAS or nonlinear models. Use exact ports from inspect. Results persist with run_id, paged data and MCP artifact resources. Sources are never overwritten; each operation gets a private folder. Long native requests support cancellation of owned processes only. GUI opening is a separate explicit open request; no desktop automation or Windows locale changes. Read fastmean://guide."""
 
+INSTRUCTIONS += " Inspect returns critical metadata and root_parameters with complete paged sections. Use section/detail_path, offsets and expected_source_sha256 for large native fields. To change an existing root parameter while retaining all component bindings, use edit_parameters; edit_values replaces a component value with a literal. Numeric parameter edits preserve descriptions and recursively package models."
+
 mcp = MCPServer(name="fastmean", title="FASTMEAN circuit analysis", version=__version__,
                 instructions=INSTRUCTIONS, log_level="WARNING")
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
@@ -221,6 +223,8 @@ def fastmean_status() -> dict[str, Any]:
                           "parameter_overrides_supported": False,
                           "editing": "Modify saved project.spec.json and create a new project; originals remain unchanged"},
             "annotations": "Root numeric .parameter constants, R/C/L/U/I bindings, explanatory TEXT and saved TD/FD signal expressions in a new copy",
+            "parameter_editing": "fastmean_edit_parameters updates existing finite numeric root constants, preserving bindings and descriptions; no native expression evaluation",
+            "inspection": "Critical metadata plus complete byte-bounded pages; section/detail_path and expected_source_sha256 support stable reads of large fields",
             "plot_origin": "Matplotlib PNG rendered from the native FASTMEAN numeric export",
             "saved_data_charts": {"tool": "fastmean_plot", "max_panels": 12,
                 "input": "registered original native AC/transient run_id; exact exported columns",
@@ -297,13 +301,49 @@ def fastmean_create_project(spec: dict, name: str = "project") -> dict[str, Any]
 
 @mcp.tool(annotations=READ, structured_output=True)
 @tool_errors
-def fastmean_inspect(path: str, include_objects: bool = False) -> dict[str, Any]:
-    """Read a text SCM: components, native pins, X connections, ports and settings."""
-    result = read_scheme(source_path(path))
-    if not include_objects:
-        result.pop("objects", None)
-    from .artifacts import bounded_result
-    return bounded_result(result)
+def fastmean_inspect(path: str, include_objects: bool = False,
+        section: Literal["summary", "components", "nodes", "objects", "texts", "ports",
+                         "parameters", "analysis", "wires", "warnings", "parameter_issues"] = "summary",
+        offset: Annotated[int, Field(ge=0, le=16777216, strict=True)] = 0,
+        limit: Annotated[int, Field(ge=1, le=1000, strict=True)] = 100,
+        detail_path: Annotated[list[str | Annotated[int, Field(strict=True)]], Field(max_length=24)] | None = None,
+        expected_source_sha256: str | None = None) -> dict[str, Any]:
+    """Read SCM metadata, root parameters, ports and formulas without losing fields.
+
+    Default summary has compact components and independently budgeted pages;
+    include_objects adds a raw-object page. section selects complete native data
+    with offset/limit pagination. data is a list, mapping or text, as page.kind
+    reports. Use detail_path for nested large fields, e.g. objects [5,"Params"]
+    or analysis ["TD","Expressions"]. Text selections paginate characters.
+    Reuse source_sha256 as expected_source_sha256 on later pages to reject edits
+    between reads. Reads create no jobs and start no calculations or windows.
+    """
+    from .inspection import inspect_circuit
+    return inspect_circuit(source_path(path), include_objects, section=section,
+        offset=offset, limit=limit, detail_path=detail_path, expected_source_sha256=expected_source_sha256)
+
+
+@mcp.tool(annotations=WRITE, structured_output=True)
+@tool_errors
+def fastmean_edit_parameters(path: str, updates: dict, expected_source_sha256: str | None = None) -> dict[str, Any]:
+    """Update existing numeric root .parameter/.param constants in a new copy.
+
+    updates maps exact case-sensitive parameter names to finite numbers/SI values.
+    Only literal spans change; descriptions, component bindings, graph formulas
+    and portable model files are preserved. Expressions, ambiguous declarations
+    and overriding define/global/set names are rejected. Use inspect's
+    root_parameters before editing. This does not run a calculation or a GUI.
+    Pass the inspection's source_sha256 as expected_source_sha256 to reject
+    source changes made between inspection and this request.
+    """
+    from .parameters import edit_parameters
+    job = new_job("parameters")
+    result = edit_parameters(source_path(path), updates, job / "circuit.scm",
+                             expected_source_sha256=expected_source_sha256)
+    result.update({"working_dir": str(job), "analysis": "edit_parameters", "ok": True,
+        "dependency_artifacts": [{"path": value} for value in result.get("dependency_paths", [])],
+        "origin": "Root native parameter literals edited by MCP; no analysis performed"})
+    return store().publish(result)
 
 
 @mcp.tool(annotations=WRITE, structured_output=True)
@@ -346,6 +386,8 @@ def fastmean_edit_values(path: str, updates: dict) -> dict[str, Any]:
 
     updates maps component names to SI values, or to {value:...,waveform:...}.
     This supports R/C/L/U/I value edits and never overwrites the selected source.
+    A literal edit replaces any parameter binding on that component. To keep
+    shared .parameter bindings, use fastmean_edit_parameters instead.
     Explicit waveform fields update the selected mode, retaining omitted fields
     and other modes; waveform amplitude/high overrides value when supplied.
     """

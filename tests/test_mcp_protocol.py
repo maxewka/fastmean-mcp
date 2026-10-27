@@ -40,7 +40,7 @@ REQUIRED_TOOLS = {
     "fastmean_ac", "fastmean_transient", "fastmean_symbolic", "fastmean_inspect",
     "fastmean_list_examples", "fastmean_open", "fastmean_search_manual",
     "fastmean_relayout", "fastmean_preview", "fastmean_list_runs",
-    "fastmean_get_result", "fastmean_read_data", "fastmean_cancel", "fastmean_plot",
+    "fastmean_get_result", "fastmean_read_data", "fastmean_cancel", "fastmean_plot", "fastmean_edit_parameters",
 }
 NATIVE_ENABLED = os.environ.get("FASTMEAN_MCP_NATIVE_TEST", "").lower() in {"1", "true", "yes"}
 
@@ -314,7 +314,7 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
             async with self.session(output_dir) as client:
                 listed = await client.list_tools()
                 names = {tool.name for tool in listed.tools}
-                self.assertEqual(len(REQUIRED_TOOLS), 21)
+                self.assertEqual(len(REQUIRED_TOOLS), 22)
                 self.assertFalse(REQUIRED_TOOLS - names,
                                  f"Missing tools: {sorted(REQUIRED_TOOLS - names)}")
                 for tool in listed.tools:
@@ -516,6 +516,19 @@ class McpProtocolTests(unittest.IsolatedAsyncioTestCase):
                 preview = await client.call_tool("fastmean_preview", {"path": annotated["path"]})
                 self.assertFalse(preview.is_error, repr(payload(preview)))
                 self.assertTrue(any(getattr(item, "type", None) == "image" for item in preview.content))
+                self.assertEqual(source.read_bytes(), original)
+                edited = await self.call_success(client, "fastmean_edit_parameters", {
+                    "path": annotated["path"], "updates": {"R0":"2k", "C0":"470n"},
+                    "expected_source_sha256": inspected["source_sha256"]})
+                checked = await self.call_success(client, "fastmean_inspect", {"path":edited["path"]})
+                values = {p["name"]:p["value_si"] for p in checked["root_parameters"]["parameters"]}
+                self.assertEqual(values["R0"],2000)
+                self.assertAlmostEqual(values["C0"],470e-9,delta=1e-21)
+                self.assertEqual(next(c for c in checked["components"] if c["name"] == "R1")["value"],"R0")
+                formulas = await self.call_success(client,"fastmean_inspect",{
+                    "path":edited["path"],"section":"analysis","detail_path":["TD","Expressions"],"limit":1})
+                self.assertEqual(formulas["data"][0]["y"],td[0])
+                self.assertEqual(formulas["page"]["next_offset"],1)
                 self.assertEqual(source.read_bytes(), original)
                 rejected = await client.call_tool("fastmean_annotate_circuit", {"path": str(source), "parameters": {"bad;exit": 1}})
                 self.assertTrue(rejected.is_error)
