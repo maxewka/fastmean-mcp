@@ -485,7 +485,7 @@ class ArtifactStore:
                             or header != manifest.get("columns")):
                         raise ArtifactError("Native CSV has invalid, duplicate or mismatched columns.")
                     values = [array("d") for _ in header]
-                    count, previous = 0, None
+                    count, previous, repeated = 0, None, 0
                     for row in reader:
                         count += 1
                         if count > maximum_rows:
@@ -495,8 +495,12 @@ class ArtifactStore:
                         numbers = [float(item) for item in row]
                         if not all(math.isfinite(item) for item in numbers):
                             raise ArtifactError(f"CSV row {count} contains nonfinite values.")
-                        if (previous is not None and numbers[0] <= previous) or numbers[0] < 0 or (analysis == "ac" and numbers[0] == 0):
-                            raise ArtifactError("Native CSV axis must be finite, valid and strictly increasing.")
+                        if ((previous is not None and (numbers[0] < previous
+                                or (analysis == "ac" and numbers[0] == previous)))
+                                or numbers[0] < 0 or (analysis == "ac" and numbers[0] == 0)):
+                            raise ArtifactError("Native CSV axis must be nondecreasing for transient data and strictly increasing for AC.")
+                        if previous is not None and numbers[0] == previous:
+                            repeated += 1
                         previous = numbers[0]
                         for column, number in zip(values, numbers):
                             column.append(number)
@@ -505,6 +509,8 @@ class ArtifactStore:
                 raise ArtifactError("Native CSV SHA256 changed after publication.")
             if bytes_read != entry["size"] or count != manifest.get("row_count") or count < 2:
                 raise ArtifactError("Native CSV size or row count disagrees with its manifest.")
+            if values[0][-1] <= values[0][0]:
+                raise ArtifactError("Native CSV axis must span a positive interval.")
         except (OSError, UnicodeError, csv.Error, ValueError, TypeError) as error:
             if isinstance(error, ArtifactError):
                 raise
@@ -516,4 +522,8 @@ class ArtifactStore:
                     "native_data_sha256": native_hash.lower(),
                     "source_sha256": manifest.get("source_sha256"),
                     "engine": {key: value for key, value in manifest["engine"].items() if key in {"name", "sha256"}},
+                    "axis_ordering": "strictly_increasing" if analysis == "ac" else "nondecreasing",
+                    "repeated_timestamp_rows": repeated,
+                    "native_row_order_preserved": True,
+                    "simultaneous_samples": "retained in native order; zero-duration intervals contribute no integral",
                     "native_request": manifest.get("request", {})}}

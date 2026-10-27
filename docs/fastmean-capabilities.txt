@@ -1,5 +1,6 @@
 FASTMEAN native capabilities reference for the MCP implementation
 Research date: 2026-10-26. This document describes source evidence, not a test log.
+Power-electronics additions verified against FASTMEAN 6.1 on 2026-10-27.
 
 Sources and evidence
 --------------------
@@ -191,6 +192,52 @@ sources use four nodes in exact native pin order and a finite numeric value
 (or their single named parameter). Diodes require 0 < Ron <= Roff and Uon >= 0.
 These fields come from native saved records; they are not an arbitrary SPICE
 model interface. The symbolic and relayout adapters remain R/C/L/U only.
+
+Transformer / трансформатор: TR/TRANSFORMER, native Type6101, four nodes
+[p1,p2,s1,s2], value=n or parameters={n}; n=Np/Ns must be positive and finite.
+V(p1)-V(p2)=n*(V(s1)-V(s2)); dotted winding ends are native pins1 and3.
+TR is ideal and stores no magnetic energy. Add a separate L across its primary
+to model flyback magnetizing inductance. Ground each separate circuit part;
+the constructor uses node0 as a common numerical reference, not a floating
+secondary or insulation model. Reversing a winding's nodes reverses polarity.
+
+Voltage-controlled switch / управляемый напряжением ключ: SW/VCSWITCH,
+native Type6600, four nodes [control+,control-,switch1,switch2], all parameters
+{Ron,Roff,Uon,Uoff} required. Control is V(control+)-V(control-); the power
+branch is bidirectional and separate from the control pair. Ron>0,Roff>=Ron,
+Uoff<=Uon. Native hysteresis retains state between the two thresholds: rising
+control reaches Uon to turn on; falling control reaches Uoff to turn off.
+This is a native piecewise-linear switch, not a MOSFET or SPICE model import.
+The D diode node order is [anode,cathode], native pins1/2.
+
+Flyback / обратноходовой преобразователь: fastmean_example(kind="flyback")
+returns native TR + magnetizing LM + SW + pulse voltage drive + D/C/R output.
+Aliases include flyback_converter. Defaults:24V,50kHz,40% duty,n=1,LM=200uH,
+Cout=47uF,load20ohm. Reverse the secondary relative to the primary so the
+rectifier conducts during switch-off. Run transient stop=.01,step=1e-7,
+eps=1e-5 and signals U(out),U(drain),I(LM),I(DOUT),U(gate).
+Saved analysis.transient also accepts eps with 0<eps<=0.1; the builtin flyback
+sets EPS=1e-5 so the standalone SCM and explicit batch request agree.
+Use fastmean_plot for startup and display_window=[.00994,.01],measurement_window=[.009,.01].
+The output mean in native6.1 is about15.584V. This open-loop model excludes
+saturation, leakage inductance and transistor parasitics. To edit TR/SW values,
+modify the saved JSON and create a fresh circuit/project; edit_values and
+generated bindings retain their documented R/C/L/U/I scope.
+
+TR evidence: bundled DC-DC converter SCM and native IdealTrans geometry.
+SW evidence: native VCSwitch type dispatch, constructor, serialization and
+numerical probes of control sign, bidirectional conduction and hysteresis.
+TR body32x48; pins(-24,-32),(-24,32),(24,-32),(24,32), horizontal leads.
+SW body40x40; pins(-16,-28),(-16,28),(16,-28),(16,28), vertical leads.
+Native checks confirm n=2 maps10V to5V; D pin1 is the anode. Preview renders
+winding dots and switch control signs for all four native rotations.
+
+Switching-event exports may repeat a transient timestamp for multiple states.
+TD permits nondecreasing time and preserves every native row in order; AC
+frequencies remain strictly increasing. No averaging, sorting or duplicate
+removal is performed. Equal-time intervals contribute zero to mean/RMS;
+peak/min/max include all event states. Exact window boundaries retain both
+sides. Coverage, finite values and native provenance checks remain active.
 
 fastmean_create_project authors native Type-7100 X hierarchies. Input is
 {models:{MODEL:{pins:{Left:["B"],Top:["C"],Right:[],Bottom:["E"]},

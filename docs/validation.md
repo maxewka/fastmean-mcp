@@ -1,5 +1,48 @@
 # Validation history
 
+## 1.4.0: native transformers, controlled switches and transient events
+
+Local Windows / FASTMEAN 6.1 on 2026-10-27. The full portable suite, with
+FASTMEAN deliberately unavailable, passed: **249 passed, 29 skipped,
+329 subtests**, 152.74 seconds. The targeted final suite covering schematic
+authoring, flyback through real MCP, native TR/SW/diode primitives and repeated
+transient events passed: **27 passed, 54 subtests**, 48.45 seconds.
+
+An earlier full native-enabled suite completed with 271 passed, 5 skipped,
+337 subtests and one new-test assertion failure. That test incorrectly required
+every flyback run to contain an exactly repeated time. The new TR/SW example
+has no repeated rows; the original diode-based attempt did. The corrected test
+verifies nondecreasing native order and that the reported event count matches
+the export. Its full MCP workflow passed in the final targeted suite. Separate
+event fixtures retain repeated rows, both boundary states, correct integrals
+and peaks; decreasing TD times and duplicate AC frequencies remain errors.
+
+Native tests verify TR ratio n=Np/Ns and winding reversal through all four
+rotations; SW control polarity, both power-current directions and hysteresis;
+and D anode/cathode order. Slow 0–5 V control ramps with Uon=3 V/Uoff=2 V
+leave SW off while rising through 2.2–2.8 V and on while falling through it.
+All source circuits are preserved. Preview/routing tests verify exact native
+terminal geometry, real wires, phase dots, control signs and caption clearance.
+
+The complete built-in flyback was created, annotated, previewed, exported and
+calculated through the official MCP SDK over stdio. Native transient output
+covers 0–10 ms with 102,030 rows, step 100 ns and eps=1e-5. On 9–10 ms:
+mean output 15.583914 V, output peak-to-peak 0.148951 V, maximum switch voltage
+39.991150 V, magnetizing-current range 0.815609–1.779700 A and average diode
+current 0.779267 A. Gate-on intervals charge LM while the diode blocks;
+gate-off intervals discharge LM into the output. Startup and switching charts
+come from `fastmean_plot`; figures and the preview were visually inspected.
+
+The sample saves EPS=1e-5 in its SCM as well as passing it to batch analysis.
+The owned installer dry run and upgrade succeeded. Doctor initialized installed
+version 1.4.0, discovered 22 tools and successfully called status. All 23
+installed Python/data files matched the source. Existing MCP settings and other
+server configurations retained their parsed values; the installer saved its
+normal private configuration backup. A fresh SDK session launched from the
+installed environment outside the checkout repeated the complete flyback
+workflow with identical numeric measurements. No Windows settings changed.
+These are local results, not a claim of hosted CI execution.
+
 ## 1.3.2: finite self-test models and copied root references
 
 Local Windows / FASTMEAN6.1 on 2026-10-27: **244 passed, 5 skipped,

@@ -190,7 +190,8 @@ manifest while it is read. Existing source files are preserved.
 Numeric sources are limited to completed, registered native AC/transient runs.
 The tool accepts no arbitrary CSV filename, URL, Python code or newly evaluated
 formula. Published-file checks reject traversal, symlinks/junctions and changed
-artifacts. Tables must have finite values, a valid strictly increasing axis,
+artifacts. Tables must have finite values, a strictly increasing AC frequency
+axis or a nondecreasing transient time axis,
 at most 31 columns, and at most 10,000 AC or 1,000,001 transient rows. Internal
 verified CSV processing permits up to 256 MiB; individual public resource reads
 remain limited to 8 MiB, with large source tables available through paged
@@ -198,3 +199,20 @@ remain limited to 8 MiB, with large source tables available through paged
 
 The chart identifies FASTMEAN as the numeric solver and Matplotlib as the
 renderer. Native application screenshots require a separate explicit action.
+
+## Switching events
+
+FASTMEAN can export several states at the same time during a switch or diode
+transition. The adapter preserves every row in native order, including both
+sides of these jumps. It neither removes duplicate timestamps nor averages
+their signal values. A decreasing time remains an error, and the requested
+start/end coverage is still checked.
+
+At an exact window boundary, all states at that time remain available for the
+graph and peak/min/max measurements. Mean and RMS integrate only positive
+time intervals: a zero-duration jump contributes no area. Between events,
+interpolation uses the last state of the previous timestamp and the first
+state of the next one. Measurements use the full data before graphical
+decimation. Rendering retains both sides of every switching jump; an event
+window that exceeds the display vertex budget must be narrowed.
+The manifest and chart provenance record the ordering and repeated-time count.

@@ -34,6 +34,8 @@ INSTRUCTIONS = """Use the installed FASTMEAN native engines for circuit analysis
 
 INSTRUCTIONS += " Inspect returns critical metadata and root_parameters with complete paged sections. Use section/detail_path, offsets and expected_source_sha256 for large native fields. To change an existing root parameter while retaining all component bindings, use edit_parameters; edit_values replaces a component value with a literal. Numeric parameter edits preserve descriptions and recursively package models."
 
+INSTRUCTIONS += " Native TR transformers and SW voltage-controlled switches are available in create_circuit/create_project. Start switching converters with example(kind='flyback'); an ideal TR needs a separate magnetizing inductance for flyback energy storage. Read the guide for native terminal polarity. Transient switching events may contain repeated timestamps: preserve both sides in native order; plot supports these events."
+
 mcp = MCPServer(name="fastmean", title="FASTMEAN circuit analysis", version=__version__,
                 instructions=INSTRUCTIONS, log_level="WARNING")
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
@@ -218,7 +220,14 @@ def fastmean_status() -> dict[str, Any]:
                 (installation / "symbolic" / name).is_file() for name in ("cirsymw.exe", "human.sym"))),
             "output_directory": str(output_dir()), "windows_locale_modified": False, "active_operations": active,
             "native_operations": ["AC frequency response", "transient analysis", "netlist export", "CIRSYM symbolic linear analysis"],
-            "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
+            "authoring": "R/C/L/U/I, fixed numeric native D/G/E/F/TR/SW primitives, portable X subcircuit projects; DC/sine/pulse U/I waveforms; I nodes [from,to]",
+            "power_electronics": {
+                "transformer": {"kind": "TR", "native_type": 6101, "parameters": ["n"],
+                    "energy_storage": "Ideal transformer; add a separate L across its primary for flyback magnetizing inductance"},
+                "voltage_controlled_switch": {"kind": "SW", "native_type": 6600,
+                    "parameters": ["Uon", "Uoff", "Ron", "Roff"]},
+                "example": "fastmean_example(kind='flyback')",
+                "transient_events": "Equal timestamps retain both native event states; zero-duration jumps add no time integral"},
             "hierarchy": {"native_type": 7100, "max_model_definitions": 99, "max_pins_per_model": 32,
                           "parameter_overrides_supported": False,
                           "editing": "Modify saved project.spec.json and create a new project; originals remain unchanged"},
@@ -242,11 +251,13 @@ def fastmean_status() -> dict[str, Any]:
 @mcp.tool(annotations=READ, structured_output=True)
 @tool_errors
 def fastmean_example(kind: str = "rc_lowpass") -> dict[str, Any]:
-    """Get an editable circuit JSON spec: rc_lowpass, rlc_lowpass or voltage_divider.
+    """Get an editable JSON spec: rc_lowpass, rlc_lowpass, voltage_divider, flyback.
 
     components have kind, name, nodes [positive,negative] for U/V, and SI value.
     Voltage waveform: {kind:dc|sine|pulse, frequency, amplitude, phase, delay,
     high, low, duty_percent, rise_time}; only fields applicable to its kind.
+    flyback uses a native TR transformer, separate magnetizing L, native SW
+    voltage-controlled switch, pulse drive and diode rectifier. Use transient.
     """
     return example_circuit(kind)
 
@@ -266,8 +277,13 @@ def fastmean_create_circuit(spec: dict, name: str = "circuit") -> dict[str, Any]
     A single-terminal node gets one short wire and native CON endpoint, without
     an added electrical load or external PORT.
     All names used in analysis must be ASCII. Does not open a window.
-    Fixed native primitives: D uses parameters={Ron,Roff,Uon}; G/VCCS,
+    Fixed native primitives: D nodes=[anode,cathode], parameters={Ron,Roff,Uon}; G/VCCS,
     E/VCVS and F/CCCS use four native-ordered nodes and a numeric value.
+    TR/TRANSFORMER nodes=[p1,p2,s1,s2], dotted pins1/3, n=Np/Ns>0;
+    value=n or parameters={n}. SW/VCSWITCH nodes=[control+,control-,switch1,switch2],
+    parameters={Ron,Roff,Uon,Uoff}, 0<Ron<=Roff, Uoff<=Uon; native hysteresis.
+    See example(kind='flyback') and the guide for polarity and magnetic storage.
+    spec.analysis.transient accepts stop, step and eps (0<eps<=0.1), saved in SCM.
     Use fastmean_create_project for X subcircuits and portable model files.
     """
     filename = _filename(name)
@@ -634,7 +650,8 @@ def fastmean_plot(run_id: str,
     with finite positive scale. No new formulas are evaluated. For native power,
     export e.g. U(OUT)*I(RL) during transient and select that exact column here.
     Windows are [start,stop] in original seconds/Hz, independently of x_unit.
-    Interpolate exact endpoints, retain adaptive timestamps, and reject
+    Interpolate exact endpoints, retain adaptive timestamps and both states of
+    equal-time switching events in native order, and reject
     extrapolation. RMS uses trapezoids of squared samples. Metrics use the full
     measurement window before graphical decimation. Original run stays intact;
     a new run returns ImageContent, PNG/SVG/spec/measurements/manifest resources.

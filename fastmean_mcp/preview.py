@@ -17,9 +17,9 @@ from typing import Any
 from .schematic import _load, _summarize, parse_value
 
 ORIGIN = "MCP schematic preview, not native screenshot"
-_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 7100}
+_SUPPORTED = {200, 300, 400, 900, 1000, 1001, 1002, 2010, 3010, 1101, 6000, 6001, 6002, 6101, 6600, 7100}
 _COMPONENTS = {1000: "R", 1001: "C", 1002: "L", 2010: "U", 3010: "I"}
-_NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 7100}
+_NATIVE_COMPONENTS = {1101, 6000, 6001, 6002, 6101, 6600, 7100}
 _DIRECTIONS = ((-1, 0), (0, -1), (1, 0), (0, 1))
 _RENDER_LOCK = threading.Lock()
 
@@ -120,6 +120,11 @@ def _model(source: Path) -> dict:
         elif tid in {6000, 6001, 6002}:
             key, unit = {6000: ("g", "S"), 6001: ("k", ""), 6002: ("h", "")}[tid]
             values[oid] = key + "=" + _quantity((obj.get("Params") or {}).get(key), unit).rstrip()
+        elif tid == 6101:
+            values[oid] = "n=" + _quantity((obj.get("Params") or {}).get("n"), "").rstrip()
+        elif tid == 6600:
+            params = obj.get("Params") or {}
+            values[oid] = "Uon=" + _quantity(params.get("Uon"), "V") + "; Uoff=" + _quantity(params.get("Uoff"), "V")
         elif tid == 7100:
             values[oid] = Path(str((obj.get("Params") or {}).get("FileName", "")).replace("\\", "/")).stem
         elif tid == 900:
@@ -202,7 +207,7 @@ def _draw_component(axis, obj, value):
 
 def _draw_native_component(axis, obj, value):
     """Engineering symbols with the exact native connection coordinates."""
-    from matplotlib.patches import FancyArrowPatch, Polygon, Rectangle
+    from matplotlib.patches import Circle, FancyArrowPatch, Polygon, Rectangle
     from .native_geometry import body_bounds, pin_directions, pin_labels, pin_positions
     points, directions = pin_positions(obj), pin_directions(obj)
     left, top, right, bottom = body_bounds(obj)
@@ -214,6 +219,11 @@ def _draw_native_component(axis, obj, value):
     def inset(pin, distance):
         point, direction = points[pin], directions[pin]
         return point[0] - direction[0] * distance, point[1] - direction[1] * distance
+
+    def symbol_point(x, y):
+        for _ in range(obj["Rot"]):
+            x, y = -y, x
+        return obj["X"] + x, obj["Y"] + y
 
     if tid == 1101:
         a, b = points[1], points[2]
@@ -227,6 +237,42 @@ def _draw_native_component(axis, obj, value):
         axis.add_patch(Polygon([point(-10,-10), point(-10,10), point(8)], closed=True,
                                facecolor="white", edgecolor="#161b22", linewidth=1.55, zorder=4))
         line(point(11,-12), point(11,12))  # Native pin1 anode → pin2 cathode.
+    elif tid == 6101:
+        # Two isolated windings. The corners retain the native horizontal
+        # terminal directions at (+/-24,+/-32), outside the winding body.
+        for side, pins in ((-1, (1, 2)), (1, (3, 4))):
+            winding_x = side * 10
+            for pin, y in zip(pins, (-32, 32)):
+                corner = symbol_point(winding_x, y)
+                line(points[pin], corner)
+                line(corner, symbol_point(winding_x, -24 if y < 0 else 24))
+            for turn in range(4):
+                center_y = -18 + 12 * turn
+                coil = [symbol_point(winding_x - side * 5 * math.sin(math.pi * i / 24),
+                                     center_y - 6 * math.cos(math.pi * i / 24))
+                        for i in range(25)]
+                axis.plot(*zip(*coil), color="#161b22", linewidth=1.55, zorder=4)
+            # Native V(1)-V(2) = n * (V(3)-V(4)): pins 1 and 3
+            # identify corresponding winding ends for positive n.
+            axis.add_patch(Circle(symbol_point(side * 14, -21), 1.7,
+                                  facecolor="#161b22", edgecolor="none", zorder=5))
+        for x in (-1.5, 1.5):
+            line(symbol_point(x, -23), symbol_point(x, 23))
+    elif tid == 6600:
+        # An open contact is the schematic symbol, not the computed state.
+        # Control and switched terminals are separate electrical branches.
+        for pin, y in ((1, -16), (2, 16), (3, -12), (4, 12)):
+            line(points[pin], symbol_point(-16 if pin < 3 else 16, y))
+        for y, sign in ((-8, "+"), (8, "−")):
+            x, transformed_y = symbol_point(-16, y)
+            axis.text(x, transformed_y, sign, ha="center", va="center", fontsize=8,
+                      color="#161b22", zorder=8, parse_math=False)
+        for y in (-12, 12):
+            axis.add_patch(Circle(symbol_point(16, y), 1.7, facecolor="white",
+                                  edgecolor="#161b22", linewidth=1.2, zorder=5))
+        line(symbol_point(16, 12), symbol_point(7, -8))
+        axis.plot(*zip(symbol_point(-7, 0), symbol_point(10, 0)), color="#6b7280",
+                  linewidth=1, linestyle="--", zorder=4)
     else:
         axis.add_patch(Rectangle((left, top), right-left, bottom-top, facecolor="white",
                                  edgecolor="#161b22", linewidth=1.55, zorder=4))
@@ -261,7 +307,7 @@ def _draw_native_component(axis, obj, value):
                 x, y = inset(pin, 15)
                 axis.text(x, y, str(pin), ha="center", va="center", fontsize=7,
                           color="#374151", zorder=8, parse_math=False)
-    if tid in {1101, 6000, 6001, 6002}:
+    if tid in {1101, 6000, 6001, 6002, 6101, 6600}:
         from .captions import native_component_captions
         for caption in native_component_captions(obj, value):
             caption = dict(caption)
@@ -372,6 +418,6 @@ def render_schematic(path: Path, output_dir: Path, *, include_text: bool = True)
             "port_count": sum(o["Type"] == 400 for o in objects.values()), "wire_count": len(model["segments"]),
             "junction_count": sum(o["Type"] == 300 and model["degrees"][oid] >= 3 for oid, o in objects.items()),
             "routing_waypoint_count": sum(o["Type"] == 300 and model["degrees"][oid] == 2 for oid, o in objects.items()),
-            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/X geometry",
+            "geometry": "SCM native pin anchors and explicit orthogonal wires; R/C/L/U/I terminals ±40; native D/G/E/F/TR/SW/X geometry",
             "approximate_wire_routes": False, "text_objects_included": include_text,
             "omitted_text_objects": omitted_text, "warnings": model["warnings"]}

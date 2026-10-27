@@ -64,22 +64,32 @@ def _window(value: Any, x, label: str) -> list[float]:
 
 
 def clip_window(x, y, window: list[float]) -> tuple[list[float], list[float], int]:
-    """Retain adaptive timestamps and interpolate only the exact endpoints."""
-    start, stop = window
+    """Keep all event rows, including both sides at an exact window boundary.
 
-    def boundary(at):
-        right = bisect_left(x, at)
-        if right < len(x) and x[right] == at:
-            return y[right], 0
+    Between distinct times interpolation connects the last row at the earlier
+    time to the first row at the later time. Equal-time rows remain ordered,
+    have zero integration duration, and all participate in peak measurements.
+    """
+    start, stop = window
+    left, right = bisect_left(x, start), bisect_right(x, stop)
+    clipped_x, clipped_y = list(x[left:right]), list(y[left:right])
+    interpolated = 0
+
+    def boundary(at, right):
         left = right - 1
         weight = (at - x[left]) / (x[right] - x[left])
         # Weighted endpoints avoid overflowing the difference of opposite signs.
-        return (1 - weight) * y[left] + weight * y[right], 1
+        return (1 - weight) * y[left] + weight * y[right]
 
-    first, count_a = boundary(start)
-    last, count_b = boundary(stop)
-    left, right = bisect_right(x, start), bisect_left(x, stop)
-    return [start, *x[left:right], stop], [first, *y[left:right], last], count_a + count_b
+    if left == len(x) or x[left] != start:
+        clipped_x.insert(0, start)
+        clipped_y.insert(0, boundary(start, left))
+        interpolated += 1
+    if right == 0 or x[right - 1] != stop:
+        clipped_x.append(stop)
+        clipped_y.append(boundary(stop, right))
+        interpolated += 1
+    return clipped_x, clipped_y, interpolated
 
 
 def measure(x, y, requested: list[str]) -> dict[str, float]:
@@ -89,14 +99,22 @@ def measure(x, y, requested: list[str]) -> dict[str, float]:
 
     def average(values):
         return math.fsum((0.5 * values[i - 1] + 0.5 * values[i])
-                         * ((x[i] - x[i - 1]) / duration) for i in range(1, len(x)))
+                         * ((x[i] - x[i - 1]) / duration) for i in range(1, len(x))
+                         if x[i] > x[i - 1])
 
     result = {}
     for metric in requested:
         if metric == "mean":
             value = average(y)
         elif metric == "rms":
-            value = maximum * math.sqrt(average([(value / maximum) ** 2 for value in y])) if maximum else 0.0
+            # A huge intermediate event state with zero duration is a real
+            # peak, but must neither set the RMS scale nor cause underflow in
+            # the finite-duration samples. Normalize only positive intervals.
+            rms_scale = max(max(abs(y[i - 1]), abs(y[i])) for i in range(1, len(x)) if x[i] > x[i - 1])
+            value = rms_scale * math.sqrt(math.fsum(
+                (0.5 * (y[i - 1] / rms_scale) ** 2 + 0.5 * (y[i] / rms_scale) ** 2)
+                * ((x[i] - x[i - 1]) / duration) for i in range(1, len(x))
+                if x[i] > x[i - 1])) if rms_scale else 0.0
         elif metric == "peak":
             value = maximum
         elif metric == "min":
@@ -194,7 +212,8 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
         "axis": columns[0], "window": measurement,
         "method": {"mean": "trapezoid(y, t) / duration", "rms": "sqrt(trapezoid(y**2, t) / duration)",
                    "peak": "max(abs(y)) at native samples and interpolated window endpoints",
-                   "boundaries": "piecewise-linear interpolation; original adaptive timestamps; no extrapolation",
+                   "boundaries": "piecewise-linear interpolation between distinct times; all native rows at exact endpoints retained; no extrapolation",
+                   "simultaneous_samples": "native order retained; zero-duration intervals add no integral; all event states included in extrema",
                    "values": "metrics use native exported column values; display_metrics apply panel scale"},
         "signals": measurements}
     return {"spec": spec, "measurements": measurement_result, "series": rendered,
@@ -202,17 +221,25 @@ def prepare_plot(store, run_id: str, panels: list[dict] | None = None,
 
 
 def _decimate(x, y):
-    """Bound SVG/PNG vertices while preserving extrema of each display bucket."""
+    """Bound vertices without losing either side of a native switching jump."""
     if len(x) <= MAX_VERTICES:
         return x, y
-    stride = math.ceil((len(x) - 2) / ((MAX_VERTICES - 2) // 2))
-    selected = [0]
+    selected = {0, len(x) - 1}
+    for i in range(1, len(x)):
+        if x[i] == x[i - 1] and y[i] != y[i - 1]:
+            selected.update((i - 1, i))
+    if len(selected) > MAX_VERTICES:
+        raise PlotError("Display window contains too many switching-event rows to preserve every jump; select a shorter display_window.")
+    buckets = (MAX_VERTICES - len(selected)) // 2
+    stride = math.ceil((len(x) - 2) / buckets) if buckets else len(x)
     for start in range(1, len(x) - 1, stride):
+        if not buckets:
+            break
         end = min(len(x) - 1, start + stride)
         low = min(range(start, end), key=y.__getitem__)
         high = max(range(start, end), key=y.__getitem__)
-        selected.extend(sorted({low, high}))
-    selected.append(len(x) - 1)
+        selected.update((low, high))
+    selected = sorted(selected)
     return [x[i] for i in selected], [y[i] for i in selected]
 
 
@@ -295,7 +322,7 @@ def render_plot(plan: dict, job: Path) -> dict:
         raise PlotError("Chart SVG exceeds the MCP artifact read budget; select fewer panels.")
     renderer = {"name": "Matplotlib", "version": matplotlib.__version__, "mcp_version": __version__,
                 "chart_format": "fastmean-mcp-chart-v1", "graphical_vertices_per_panel": MAX_VERTICES,
-                "decimation": "per-bucket minimum/maximum for rendering only; measurements use original samples"}
+                "decimation": "switching-event pairs and per-bucket minimum/maximum for rendering only; measurements use original samples"}
     manifest = {"analysis": "plot", "status": "completed", "created_utc": datetime.now(timezone.utc).isoformat(),
                 "provenance": plan["provenance"], "renderer": renderer, "request": spec,
                 "plot_sha256": hashlib.sha256(png.read_bytes()).hexdigest(),

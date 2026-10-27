@@ -129,7 +129,8 @@ def _normalize_numeric_literals(document: dict) -> list[dict]:
         changes.append({"component": obj.get("Name"), "type": obj["Type"],
                         "field": field, "original": value, "si_value": number})
 
-    passive = {1000: ("R",), 1001: ("C", "IC"), 1002: ("L", "IC")}
+    numeric_fields = {1000: ("R",), 1001: ("C", "IC"), 1002: ("L", "IC"),
+                      6101: ("n",), 6600: ("Uon", "Uoff", "Ron", "Roff")}
     waveform = {
         "DC": ("U0", "I0", "Delay", "TFR"),
         "AC": ("U0", "I0", "F", "PHI0", "FD", "NP", "Delay"),
@@ -138,7 +139,7 @@ def _normalize_numeric_literals(document: dict) -> list[dict]:
         "USER": ("ScaleT", "ScaleU", "ScaleI", "OffsetU", "OffsetI", "Delay", "PER", "NP")}
     for obj in document["scm"]["Scheme"].get("Objects") or []:
         params = obj.get("Params") or {}
-        for key in passive.get(obj.get("Type"), ()):
+        for key in numeric_fields.get(obj.get("Type"), ()):
             if key in params:
                 scalar(params, key, key, obj)
         if obj.get("Type") in (2010, 3010):
@@ -429,7 +430,11 @@ def _validate_requested_axis(rows: list[list[float]], analysis: str, request: di
     return {"requested_start": start, "requested_end": end,
             "observed_start": rows[0][0], "observed_end": rows[-1][0],
             "coverage_verified": True,
-            "sampling_verified": request["scale"] if analysis == "ac" else "adaptive"}
+            "sampling_verified": request["scale"] if analysis == "ac" else "adaptive",
+            "ordering": "strictly_increasing" if analysis == "ac" else "nondecreasing",
+            "repeated_timestamp_rows": sum(rows[i][0] == rows[i - 1][0] for i in range(1, len(rows))),
+            "native_row_order_preserved": True,
+            "simultaneous_samples": "retained in native order; zero-duration intervals contribute no integral"}
 
 
 def parse_native_table(path: str | Path, columns: int, max_rows: int = MAX_TRANSIENT_STEPS + 1,
@@ -493,9 +498,15 @@ def _plot_file(path: Path, columns: list[str], rows: list[list[float]], analysis
         x = [row[0] for row in rows]
         # Preserve all samples in CSV; cap graphical vertices for huge runs.
         stride = max(1, len(rows) // 50000)
-        selected = list(range(0, len(rows), stride))
-        if selected[-1] != len(rows) - 1:
-            selected.append(len(rows) - 1)
+        selected = set(range(0, len(rows), stride))
+        selected.add(len(rows) - 1)
+        # Keep both sides of native switching events even in the overview PNG.
+        # Collapsing equal timestamps or subsampling only one side invents a
+        # finite-duration ramp and can hide a switching spike.
+        for i in range(1, len(rows)):
+            if x[i] == x[i - 1]:
+                selected.update((i - 1, i))
+        selected = sorted(selected)
         for index, axis in enumerate(axes, 1):
             _check_cancelled(cancelled)
             axis.plot([x[i] for i in selected], [rows[i][index] for i in selected], linewidth=1.2)
@@ -751,8 +762,10 @@ class Engine:
             rows = parse_native_table(native, len(signals) + 1, max_rows, cancelled)
             if expected_rows is not None and len(rows) != expected_rows:
                 raise EngineError(f"Native AC row count {len(rows)} does not match requested {expected_rows}.")
-            if any(rows[i][0] <= rows[i-1][0] for i in range(1, len(rows))):
-                raise EngineError("Native table axis is not strictly increasing.")
+            if any(rows[i][0] < rows[i-1][0] for i in range(1, len(rows))):
+                raise EngineError("Native table axis decreases; native sample order must be preserved.")
+            if axis == "f" and any(rows[i][0] == rows[i-1][0] for i in range(1, len(rows))):
+                raise EngineError("Native AC table axis is not strictly increasing.")
             if axis == "f" and rows[0][0] <= 0:
                 raise EngineError("Native AC data has a non-positive frequency.")
             if axis == "t" and rows[0][0] < 0:

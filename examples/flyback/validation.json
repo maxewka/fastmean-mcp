@@ -1,0 +1,113 @@
+{
+  "server_version": "1.4.0",
+  "native_solver": "FASTMEAN 6.1",
+  "native_executable_sha256": "a001582ada87cdf013605f43b019957ae23204ef4bfcc33be02a0681b186ee25",
+  "request": {
+    "signals": [
+      "U(out)",
+      "U(drain)",
+      "I(LM)",
+      "I(DOUT)",
+      "U(gate)"
+    ],
+    "stop": 0.01,
+    "step": 1e-07,
+    "eps": 1e-05
+  },
+  "row_count": 102030,
+  "axis_validation": {
+    "requested_start": 0.0,
+    "requested_end": 0.01,
+    "observed_start": 0.0,
+    "observed_end": 0.01,
+    "coverage_verified": true,
+    "sampling_verified": "adaptive",
+    "ordering": "nondecreasing",
+    "repeated_timestamp_rows": 0,
+    "native_row_order_preserved": true,
+    "simultaneous_samples": "retained in native order; zero-duration intervals contribute no integral"
+  },
+  "measurements": {
+    "format": "fastmean-mcp-measurements-v1",
+    "axis": "t",
+    "window": [
+      0.009,
+      0.01
+    ],
+    "method": {
+      "mean": "trapezoid(y, t) / duration",
+      "rms": "sqrt(trapezoid(y**2, t) / duration)",
+      "peak": "max(abs(y)) at native samples and interpolated window endpoints",
+      "boundaries": "piecewise-linear interpolation between distinct times; all native rows at exact endpoints retained; no extrapolation",
+      "simultaneous_samples": "native order retained; zero-duration intervals add no integral; all event states included in extrema",
+      "values": "metrics use native exported column values; display_metrics apply panel scale"
+    },
+    "signals": [
+      {
+        "signal": "U(out)",
+        "unit": "V",
+        "scale": 1.0,
+        "metrics": {
+          "mean": 15.583914276509637,
+          "peak_to_peak": 0.14895127555520027
+        },
+        "display_metrics": {
+          "mean": 15.583914276509637,
+          "peak_to_peak": 0.14895127555520027
+        },
+        "sample_count": 10202,
+        "interpolated_boundaries": 1
+      },
+      {
+        "signal": "U(drain)",
+        "unit": "V",
+        "scale": 1.0,
+        "metrics": {
+          "max": 39.9911502905877
+        },
+        "display_metrics": {
+          "max": 39.9911502905877
+        },
+        "sample_count": 10202,
+        "interpolated_boundaries": 1
+      },
+      {
+        "signal": "I(LM)",
+        "unit": "A",
+        "scale": 1.0,
+        "metrics": {
+          "min": 0.815608918784296,
+          "max": 1.77970026303199
+        },
+        "display_metrics": {
+          "min": 0.815608918784296,
+          "max": 1.77970026303199
+        },
+        "sample_count": 10202,
+        "interpolated_boundaries": 1
+      },
+      {
+        "signal": "I(DOUT)",
+        "unit": "A",
+        "scale": 1.0,
+        "metrics": {
+          "mean": 0.7792670993163224
+        },
+        "display_metrics": {
+          "mean": 0.7792670993163224
+        },
+        "sample_count": 10202,
+        "interpolated_boundaries": 1
+      },
+      {
+        "signal": "U(gate)",
+        "unit": "V",
+        "scale": 1.0,
+        "metrics": {},
+        "display_metrics": {},
+        "sample_count": 0,
+        "interpolated_boundaries": 0
+      }
+    ]
+  }
+}

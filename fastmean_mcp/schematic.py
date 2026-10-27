@@ -1,7 +1,8 @@
 """Read and author FASTMEAN 5.x text SCM files without starting FASTMEAN.
 
-Creation supports R/C/L/U/I, fixed native diode and controlled-source primitives,
-and named native subcircuit instances. Names used by the native analysis engine
+Creation supports R/C/L/U/I, fixed native diode, controlled-source, ideal
+transformer and voltage-controlled switch primitives, and named native
+subcircuit instances. Names used by the native analysis engine
 are ASCII identifiers. Existing UTF-8 and Windows-1251 diagrams, including
 Russian labels, can be read without rewriting.
 
@@ -26,16 +27,17 @@ import yaml
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_COMPONENTS = 200
 TYPE_IDS = {"R": 1000, "C": 1001, "L": 1002, "U": 2010,
-            "D": 1101, "G": 6000, "E": 6001, "F": 6002, "X": 7100,
+            "D": 1101, "G": 6000, "E": 6001, "F": 6002, "TR": 6101, "SW": 6600, "X": 7100,
             "I": 3010, "GND": 200, "CON": 300, "PORT": 400, "TEXT": 900}
 KINDS = {value: key for key, value in TYPE_IDS.items()}
 PIN_COUNTS = {1000: 2, 1001: 2, 1002: 2, 2010: 2, 3010: 2,
-              1101: 2, 6000: 4, 6001: 4, 6002: 4,
+              1101: 2, 6000: 4, 6001: 4, 6002: 4, 6101: 4, 6600: 4,
               200: 1, 300: 4, 400: 1, 900: 0}
-CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "X"})
+CREATE_KINDS = frozenset({"R", "C", "L", "U", "I", "D", "G", "E", "F", "TR", "SW", "X"})
 EDIT_KINDS = frozenset({"R", "C", "L", "U", "I"})
 _SIDES = ("Left", "Top", "Right", "Bottom")
-_KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X"}
+_KIND_ALIASES = {"V": "U", "DIODE": "D", "VCCS": "G", "VCVS": "E", "CCCS": "F", "SUB": "X",
+                 "TRANSFORMER": "TR", "VCSWITCH": "SW"}
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _NUMBER = re.compile(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([A-Za-zµμА-Яа-я]*)$")
 _MULTIPLIERS = {"": 1., "k": 1e3, "K": 1e3, "M": 1e6, "meg": 1e6,
@@ -335,7 +337,7 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                        "TFR": "rise_time", quantity+"MAX": "high", quantity+"MIN": "low", "K": "duty_percent"}
             item["waveform"] = {"kind": {1: "dc", 2: "sine", 3: "pulse"}.get(mode, "unsupported"),
                                 **{public: copy.deepcopy(active[native]) for native, public in aliases.items() if native in active}}
-        elif kind in {"D", "G", "E", "F", "X"}:
+        elif kind in {"D", "G", "E", "F", "TR", "SW", "X"}:
             item["nodes"] = native_nodes
             # This compatibility field is also the R/C/L/U-only relayout guard.
             # Native analysis supports these objects without flattening them in
@@ -346,6 +348,17 @@ def _summarize(document: dict, path: Path, encoding: str) -> dict:
                 item["terminal_order"] = "native_pins_1_2_3_4"
             elif kind == "D":
                 item["terminal_order"] = "native_pins_1_2"
+                item["pin_roles"] = ["anode", "cathode"]
+            elif kind == "TR":
+                item["value"] = params.get("n")
+                item["terminal_order"] = "primary_1_primary_2_secondary_1_secondary_2"
+                item["pin_roles"] = ["primary_dot", "primary_undotted", "secondary_dot", "secondary_undotted"]
+                item["voltage_relation"] = "V(primary_1,primary_2) = n * V(secondary_1,secondary_2)"
+                item["energy_storage"] = "none; add a separate magnetizing inductance for flyback"
+            elif kind == "SW":
+                item["terminal_order"] = "control_1_control_2_switch_1_switch_2"
+                item["pin_roles"] = ["control_positive", "control_negative", "switch_1", "switch_2"]
+                item["control_voltage"] = "V(control_1)-V(control_2)"
             else:
                 pin_names = _subcircuit_pin_names(obj)
                 item["pin_names"] = pin_names
@@ -496,14 +509,16 @@ def _configure_analysis(defaults: dict, options: Any, nodes: set[str]) -> None:
     frequency = options.get("frequency", {})
     if not isinstance(transient, dict) or not isinstance(frequency, dict):
         raise SchemeError("transient and frequency settings must be mappings.")
-    if set(transient) - {"start", "stop", "step"} or set(frequency) - {"start", "stop", "points"}:
+    if set(transient) - {"start", "stop", "step", "eps"} or set(frequency) - {"start", "stop", "points"}:
         raise SchemeError("Unsupported native analysis setting.")
     td = defaults["TD"]["IP"][0]
-    for key, native in {"start": "StartTime", "stop": "EndTime", "step": "TimeStep"}.items():
+    for key, native in {"start": "StartTime", "stop": "EndTime", "step": "TimeStep", "eps": "EPS"}.items():
         if key in transient:
             td[native] = parse_value(transient[key])
     if td["StartTime"] < 0 or td["EndTime"] <= td["StartTime"] or td["TimeStep"] <= 0:
         raise SchemeError("Transient interval/step is invalid.")
+    if not 0 < td["EPS"] <= .1:
+        raise SchemeError("Transient eps must satisfy 0 < eps <= 0.1.")
     fd = defaults["FD"]
     for key, native in {"start": "StartFreq", "stop": "EndFreq"}.items():
         if key in frequency:
@@ -601,7 +616,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             raise SchemeError("Component kind and type disagree.")
         kind = alternatives[0] if alternatives else ""
         if kind not in CREATE_KINDS:
-            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS and X.")
+            raise SchemeError(f"Generation of {kind!r} is unsupported. Supported: R, C, L, U/V, I, D, G/VCCS, E/VCVS, F/CCCS, TR, SW and X.")
         name = _identifier(raw.get("name"), "Component name")
         if name.casefold() in names:
             raise SchemeError(f"Duplicate component name: {name}")
@@ -609,9 +624,9 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
         allowed = {"kind", "type", "name", "nodes", "value", "waveform", "initial_condition"}
         if kind == "X":
             allowed = {"kind", "type", "name", "model", "connections"}
-        elif kind == "D":
+        elif kind in {"D", "SW"}:
             allowed = {"kind", "type", "name", "nodes", "parameters"}
-        elif kind in {"G", "E", "F"}:
+        elif kind in {"G", "E", "F", "TR"}:
             allowed = {"kind", "type", "name", "nodes", "value", "parameters"}
         if set(raw) - allowed:
             raise SchemeError(f"{name}: unsupported component properties; model parameter overrides are not generated.")
@@ -629,7 +644,7 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
             params = {"FileName": definition["path"], "Pins": copy.deepcopy(definition["pins"])}
             item.update({"model": model, "connections": dict(zip(pin_names, terminals))})
         else:
-            count = 4 if kind in {"G", "E", "F"} else 2
+            count = 4 if kind in {"G", "E", "F", "TR", "SW"} else 2
             terminals = raw.get("nodes")
             if not isinstance(terminals, list) or len(terminals) != count:
                 raise SchemeError(f"{name} must have exactly {count} node labels in native terminal order.")
@@ -644,8 +659,18 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                 if params["Ron"] <= 0 or params["Roff"] < params["Ron"] or params["Uon"] < 0:
                     raise SchemeError(f"{name}: diode requires 0 < Ron <= Roff and Uon >= 0.")
                 item["parameters"] = copy.deepcopy(params)
-            elif kind in {"G", "E", "F"}:
-                key = {"G": "g", "E": "k", "F": "h"}[kind]
+            elif kind == "SW":
+                raw_params = raw.get("parameters")
+                if not isinstance(raw_params, dict) or set(raw_params) != {"Ron", "Roff", "Uon", "Uoff"}:
+                    raise SchemeError(f"{name}: switch parameters must be exactly Ron, Roff, Uon and Uoff.")
+                params = {key: parse_value(raw_params[key]) for key in ("Ron", "Roff", "Uon", "Uoff")}
+                if params["Ron"] <= 0 or params["Roff"] < params["Ron"] or params["Uoff"] > params["Uon"]:
+                    raise SchemeError(f"{name}: switch requires 0 < Ron <= Roff and Uoff <= Uon.")
+                if terminals[2] == terminals[3]:
+                    raise SchemeError(f"{name}: switch power terminals must differ.")
+                item["parameters"] = copy.deepcopy(params)
+            elif kind in {"G", "E", "F", "TR"}:
+                key = {"G": "g", "E": "k", "F": "h", "TR": "n"}[kind]
                 if "parameters" in raw:
                     raw_params = raw["parameters"]
                     if "value" in raw or not isinstance(raw_params, dict) or set(raw_params) != {key}:
@@ -654,6 +679,8 @@ def _normalize_components(components: list, context: dict[str, dict]) -> tuple[l
                 else:
                     value = parse_value(raw.get("value"))
                 item["value"], params = value, {key: value}
+                if kind == "TR" and (value <= 0 or terminals[0] == terminals[1] or terminals[2] == terminals[3]):
+                    raise SchemeError(f"{name}: transformer requires n > 0 and distinct terminals in each winding.")
             else:
                 value = parse_value(raw.get("value"))
                 if kind in {"R", "C", "L"} and value <= 0:
@@ -712,8 +739,12 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
                    interface_pins: dict | None = None) -> dict:
     """Create an electrically connected native SCM from a node-based JSON spec.
 
-    R/C/L/U/I use two nodes and value. D uses fixed Ron/Roff/Uon parameters;
-    G/E/F use four native-ordered pins and a numeric gain. X instances map named
+    R/C/L/U/I use two nodes and value. D uses [anode,cathode] and fixed
+    Ron/Roff/Uon parameters; G/E/F use four native-ordered pins and a numeric
+    gain. TR uses [primary_dot,primary_undotted,secondary_dot,secondary_undotted]
+    and n=Nprimary/Nsecondary. SW uses [control+,control-,switch1,switch2] and
+    Ron/Roff/Uon/Uoff parameters. The two terminal pairs remain electrically
+    separate in both primitives. X instances map named
     model pins through model_context. U nodes are [positive, negative], with
     native pins reversed. I nodes are [from,to]. Ground aliases are 0/gnd/ground. Floating subcircuit
     definitions retain exactly their declared ports without adding test points.
@@ -747,7 +778,7 @@ def create_circuit(spec: dict, path: str | Path, overwrite: bool = False, *,
             # Controlled-source control and output branches are electrically
             # separate. X is an opaque multiport here; its native definition
             # determines internal coupling and operating-point solvability.
-            pairs = list(zip(terminals[::2], terminals[1::2])) if item["kind"] in {"G", "E", "F"} else list(zip(terminals, terminals[1:]))
+            pairs = list(zip(terminals[::2], terminals[1::2])) if item["kind"] in {"G", "E", "F", "TR", "SW"} else list(zip(terminals, terminals[1:]))
             for a, b in pairs:
                 adjacency[a].add(b)
                 adjacency[b].add(a)
@@ -956,7 +987,10 @@ def edit_component_values(source_path: str | Path, updates: dict, output_path: s
 
 
 def example_circuit(kind: str = "rc_lowpass") -> dict:
-    """Return a JSON-ready, supported linear example; performs no file writes."""
+    """Return a JSON-ready supported example; performs no file writes."""
+    if kind in {"flyback", "flyback_converter"}:
+        from .examples import flyback_circuit
+        return flyback_circuit()
     if kind == "rc_lowpass":
         components = [{"kind": "U", "name": "U1", "nodes": ["in", "0"], "value": 1,
                        "waveform": {"kind": "sine", "frequency": "1k"}},
@@ -974,7 +1008,7 @@ def example_circuit(kind: str = "rc_lowpass") -> dict:
                       {"kind": "R", "name": "R1", "nodes": ["in", "out"], "value": "1k"},
                       {"kind": "R", "name": "R2", "nodes": ["out", "0"], "value": "1k"}]
     else:
-        raise SchemeError("Examples: rc_lowpass, rlc_lowpass, voltage_divider.")
+        raise SchemeError("Examples: rc_lowpass, rlc_lowpass, voltage_divider, flyback.")
     return {"components": components, "ports": ["in", "out"],
             "analysis": {"input": "in", "output": "out",
                          "transient": {"stop": "5m", "step": "1u"},

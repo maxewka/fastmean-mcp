@@ -145,7 +145,7 @@ class _Router:
             elif obj["Type"] in TYPE_IDS.values():
                 x, y = obj["X"], obj["Y"]
                 rectangles.append((x-20, y-20, x+20, y+20))
-            elif obj["Type"] in {1101, 6000, 6001, 6002, 7100}:
+            elif obj["Type"] in {1101, 6000, 6001, 6002, 6101, 6600, 7100}:
                 from .native_geometry import body_bounds
                 rectangles.append(body_bounds(obj))
             from .captions import CAPTION_TYPES, caption_bounds, native_component_captions, native_component_value

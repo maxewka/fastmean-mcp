@@ -1,4 +1,4 @@
-"""Native pin geometry for diodes, controlled sources and subcircuit boxes.
+"""Native pins for diodes, controlled sources, transformers, switches and boxes.
 
 Offsets are in SCM document units, independent of display zoom. The fixed
 geometry and rotation were checked against FASTMEAN 6.1's pin initialization
@@ -116,6 +116,14 @@ def _base_geometry(obj: dict):
     if tid in {6000, 6001, 6002}:
         return ({1: (-16, -28), 2: (-16, 28), 3: (8, -28), 4: (8, 28)},
                 {1: (0, -1), 2: (0, 1), 3: (0, -1), 4: (0, 1)}, (-24, -20, 24, 20))
+    if tid == 6101:
+        # Native IdealTrans: width 32, height 48, eight-unit leads.
+        return ({1: (-24, -32), 2: (-24, 32), 3: (24, -32), 4: (24, 32)},
+                {1: (-1, 0), 2: (-1, 0), 3: (1, 0), 4: (1, 0)}, (-16, -24, 16, 24))
+    if tid == 6600:
+        # Native VCSwitch: width=height=40; control pair at left.
+        return ({1: (-16, -28), 2: (-16, 28), 3: (16, -28), 4: (16, 28)},
+                {1: (0, -1), 2: (0, 1), 3: (0, -1), 4: (0, 1)}, (-20, -20, 20, 20))
     if tid == 7100:
         return _subcircuit_geometry(obj, *subcircuit_size(obj))
     raise GeometryError(f"Native geometry for component type {tid!r} is unsupported.")

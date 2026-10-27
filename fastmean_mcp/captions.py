@@ -10,7 +10,7 @@ from functools import lru_cache
 import math
 
 
-CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002})
+CAPTION_TYPES = frozenset({1000,1001,1002,2010,3010,1101,6000,6001,6002,6101,6600})
 
 
 def controlled_source_value(obj):
@@ -51,6 +51,10 @@ def native_component_value(obj):
         raise ValueError("Source captions require native DC, sine or pulse parameters.")
     if obj["Type"] == 1101:
         return "Uon="+_quantity(params.get("Uon",0),"V")+"; Ron="+_quantity(params.get("Ron",0),"Ω")
+    if tid == 6101:
+        return "n="+_quantity(params.get("n"),"")
+    if tid == 6600:
+        return "Uon="+_quantity(params.get("Uon"),"V")+"; Uoff="+_quantity(params.get("Uoff"),"V")
     return controlled_source_value(obj)
 
 
@@ -73,7 +77,7 @@ def native_component_captions(obj,value):
                  "ha":"left" if vertical else "center","fontsize":9,"fontweight":"normal"}]
     from .native_geometry import body_bounds
     left,top,right,bottom = body_bounds(obj)
-    vertical = obj.get("Rot",0) in ((1,3) if obj["Type"]==1101 else (0,2))
+    vertical = obj.get("Rot",0) in ((1,3) if obj["Type"] in {1101,6101} else (0,2))
     if vertical:
         x,y,align = right+28,(top+bottom)/2-12,"left"
         value_y = y+24
